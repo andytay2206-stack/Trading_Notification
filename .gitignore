@@ -1,0 +1,20 @@
+# Codex's local continuity notes. These may contain temporary reasoning,
+# implementation checkpoints, and environment-specific observations.
+.codex-notes/
+
+# Local secrets and configuration
+.env
+.env.*
+!.env.example
+
+# Common generated files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+node_modules/
+dist/
+build/
+*.log
+
