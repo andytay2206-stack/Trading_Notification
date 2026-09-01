@@ -6,6 +6,9 @@ const credentials = config.bybitApiKey && config.bybitApiSecret
   : {}
 
 const region = config.bybitApiRegion as APIRegion
+const regionalWsUrl = region === 'bytick'
+  ? 'wss://stream.bytick.com/v5/public/linear'
+  : undefined
 export const restClient = new RestClientV5({
   ...credentials,
   testnet: config.bybitTestnet,
@@ -16,7 +19,7 @@ const websocket = new WebsocketClient({
   ...credentials,
   testnet: config.bybitTestnet,
   restOptions: { apiRegion: region },
-  ...(config.bybitWsUrl ? { wsUrl: config.bybitWsUrl } : {}),
+  ...(config.bybitWsUrl || regionalWsUrl ? { wsUrl: config.bybitWsUrl || regionalWsUrl } : {}),
 })
 
 export function describeBybitError(error: unknown) {
