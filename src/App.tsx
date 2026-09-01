@@ -4,6 +4,8 @@ import { demoTrades } from './data/demoTrades'
 import { Dashboard } from './pages/Dashboard'
 import { Market } from './pages/Market'
 import { Backtest } from './pages/Backtest'
+import { Login } from './pages/Login'
+import { getSession, logout, type AuthUser } from './services/api'
 import type { Currency } from './types'
 
 type Page = 'dashboard' | 'market' | 'backtest'
@@ -23,6 +25,8 @@ const navigation: Array<{ page: Page; label: string; icon: string }> = [
 export default function App() {
   const [page, setPage] = useState<Page>(pageFromHash)
   const [currency, setCurrency] = useState<Currency>('USD')
+  const [user, setUser] = useState<AuthUser | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
 
   useEffect(() => {
     const onHashChange = () => setPage(pageFromHash())
@@ -30,10 +34,22 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
 
+  useEffect(() => {
+    getSession().then(({ user: sessionUser }) => setUser(sessionUser)).catch(() => setUser(null)).finally(() => setAuthLoading(false))
+  }, [])
+
   const navigate = (next: Page) => {
     window.location.hash = next === 'dashboard' ? '' : next
     setPage(next)
   }
+
+  const signOut = async () => {
+    await logout().catch(() => undefined)
+    setUser(null)
+  }
+
+  if (authLoading) return <div className="auth-loading"><div className="empty-orbit">N</div><span>Opening Northstar…</span></div>
+  if (!user) return <Login onLogin={setUser} />
 
   return (
     <div className="app-shell">
@@ -47,6 +63,11 @@ export default function App() {
             </button>
           ))}
         </nav>
+        <div className="sidebar-account">
+          <div className="account-avatar">{user.username.slice(0, 1).toUpperCase()}</div>
+          <span><b>{user.username}</b><small>Administrator</small></span>
+          <button type="button" onClick={signOut} title="Log out" aria-label="Log out">↪</button>
+        </div>
         <div className="sidebar-status"><i /><span><b>Monitor ready</b><small>BTCUSDT · Bybit</small></span></div>
       </aside>
 

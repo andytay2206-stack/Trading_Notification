@@ -2,17 +2,30 @@
 
 ## Current system
 
-Northstar is currently a client-side React and TypeScript application built with Vite.
+Northstar uses a React/TypeScript client, a Node/Express API, and PostgreSQL.
 
 ```text
-Bybit public REST API ── historical candles ─┐
-                                            ├── Live Market page
-Bybit public WebSocket ── candle updates ───┘
-
-Trade ledger ── performance calculator ─────── Dashboard
+Bybit public APIs ← bybit-api SDK ← Node API ← authenticated React client
+                                      ↓
+                                 PostgreSQL
 ```
 
-The REST request loads the latest 300 `BTCUSDT` linear perpetual candles. A public WebSocket subscription then replaces the active candle as price changes and appends a new candle when the next interval starts. A 10-second REST poll provides a fallback when WebSocket access is restricted. Vite proxies REST calls in local development.
+The Node API loads the latest 300 `BTCUSDT` linear perpetual candles using `RestClientV5`. `WebsocketClient` subscribes to Bybit klines and bridges updates to the browser through server-sent events. A 10-second REST poll provides a fallback when WebSocket access is restricted.
+
+## Authentication
+
+The administrator is seeded from environment variables at API startup. Passwords are stored as bcrypt hashes. A successful login creates a signed, HTTP-only, same-site cookie valid for 12 hours. All market, persistence, and streaming routes require this session.
+
+The `admin` / `123admin` credentials are temporary development defaults and must be replaced before deployment.
+
+## PostgreSQL records
+
+- `app_users`: application identities and password hashes
+- `trades`: persistent live or virtual trade lifecycles and R outcomes
+- `performance_snapshots`: historical dashboard aggregates
+- `backtest_runs`: strategy configuration, random period, win rate, profit, R, and drawdown for every completed test
+
+Tables are created idempotently when the API starts. Later production deployment should replace this startup initialization with versioned migrations.
 
 ## Backtesting flow
 
@@ -38,10 +51,10 @@ The demo engine enters after a fast/slow EMA crossover, uses one ATR as initial 
 
 ## Current data limitations
 
-- Demonstration trades are in memory and reset on reload.
+- Demonstration dashboard trades remain in memory; real tracked trades will use the PostgreSQL `trades` table.
 - IDR and MYR use labeled indicative rates, not a live FX feed.
 - The browser consumes Bybit's public endpoints without exchange authentication.
-- No signal rules, persistence backend, notification provider, or user account exists yet.
+- No final signal rules or notification provider exists yet.
 - Backtest results exclude fees, spread, funding, and slippage and must not be interpreted as live strategy evidence.
 
 ## Safety boundary

@@ -9,6 +9,9 @@
 - Sidebar navigation
 - Resilient WebSocket plus REST-polling market feed
 - Random-window demo backtesting engine
+- Node `bybit-api` market-data gateway
+- PostgreSQL persistence foundation
+- Administrator login and logout
 
 ## Phase 2 — Strategy specification
 
@@ -40,3 +43,4 @@
 - Add a database and secret management
 - Monitor market-feed connectivity and worker health
 - Back up and export the trade journal
+- Replace temporary credentials and startup schema creation with managed secrets and versioned migrations

@@ -1,9 +1,6 @@
 import type { Candle, CandleInterval } from '../types'
 
-const REST_URL = import.meta.env.DEV
-  ? '/bybit-api/v5/market/kline'
-  : (import.meta.env.VITE_BYBIT_REST_URL ?? 'https://api.bybit.com/v5/market/kline')
-const WS_URL = 'wss://stream.bybit.com/v5/public/linear'
+const REST_URL = '/api/market/candles'
 
 interface BybitKlineResponse {
   retCode: number
@@ -13,17 +10,14 @@ interface BybitKlineResponse {
   }
 }
 
-interface BybitSocketMessage {
-  topic?: string
-  data?: Array<{
-    start: number
-    open: string
-    high: string
-    low: string
-    close: string
-    volume: string
-    confirm: boolean
-  }>
+interface BybitStreamCandle {
+  start: number
+  open: string
+  high: string
+  low: string
+  close: string
+  volume: string
+  confirm: boolean
 }
 
 interface CandleRequest {
@@ -62,19 +56,15 @@ export function subscribeToCandles(
   onStatus: (status: 'connecting' | 'live' | 'offline') => void,
 ) {
   onStatus('connecting')
-  const socket = new WebSocket(WS_URL)
-  const topic = `kline.${interval}.BTCUSDT`
-  let pingTimer: number | undefined
+  const stream = new EventSource(`/api/market/stream?interval=${encodeURIComponent(interval)}`)
 
-  socket.addEventListener('open', () => {
-    socket.send(JSON.stringify({ op: 'subscribe', args: [topic] }))
-    pingTimer = window.setInterval(() => socket.send(JSON.stringify({ op: 'ping' })), 20_000)
+  stream.addEventListener('ready', () => {
     onStatus('live')
   })
 
-  socket.addEventListener('message', (event) => {
-    const message = JSON.parse(event.data) as BybitSocketMessage
-    const item = message.topic === topic ? message.data?.[0] : undefined
+  stream.addEventListener('message', (event) => {
+    const items = JSON.parse(event.data) as BybitStreamCandle[]
+    const item = items[0]
     if (!item) return
     onCandle({
       time: item.start / 1000,
@@ -87,11 +77,9 @@ export function subscribeToCandles(
     })
   })
 
-  socket.addEventListener('error', () => onStatus('offline'))
-  socket.addEventListener('close', () => onStatus('offline'))
+  stream.addEventListener('error', () => onStatus('offline'))
 
   return () => {
-    if (pingTimer) window.clearInterval(pingTimer)
-    socket.close()
+    stream.close()
   }
 }

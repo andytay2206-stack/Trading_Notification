@@ -1,6 +1,6 @@
 # Northstar — Futures Trading Notifications
 
-Northstar is a notification-first futures monitor. The current application provides a performance dashboard and a live Bitcoin perpetual chart powered by Bybit public market data.
+Northstar is a notification-first futures monitor. A React interface talks to a Node API that retrieves Bitcoin market data through `bybit-api` and stores application results in PostgreSQL.
 
 > The application currently monitors public data only. It does not connect to an exchange account or place orders.
 
@@ -16,21 +16,33 @@ Northstar is a notification-first futures monitor. The current application provi
 - Responsive desktop and mobile layouts
 - Persistent sidebar navigation with Overview, Live Market, and Backtesting pages
 - Random historical-window backtesting with win rate, profit, net R, and drawdown results
+- Login-protected workspace with an HTTP-only session cookie and sidebar logout
+- PostgreSQL storage for users, trades, performance snapshots, and completed backtests
 
 The initial ledger contains clearly labeled demonstration trades. Currency conversions use indicative fixed rates until a live foreign-exchange provider is selected.
 
 ## Run locally
 
-Requirements: Node.js 20 or newer.
+Requirements: Node.js 20 or newer and PostgreSQL 15 or newer. A Docker Compose definition is included as the easiest database option.
 
 ```bash
 npm install
+docker compose up -d postgres
 npm run dev
 ```
 
 Open the local address printed by Vite (normally `http://localhost:5173`).
 
-During local development, Vite proxies candle REST requests to Bybit to avoid browser cross-origin restrictions. WebSocket updates are supplemented by a REST refresh every 10 seconds, so the chart can remain live if the socket is unavailable.
+The API starts on port 3001 and the interface starts on port 5173. During local development, Vite proxies `/api` to Node. Node uses the `bybit-api` SDK for both REST candles and WebSocket events; the browser receives live events through a same-origin server-sent-event stream. A REST refresh every 10 seconds remains as a fallback.
+
+The local `.env` file is intentionally ignored by Git. Copy `.env.example` when setting up another machine. Public candles do not need Bybit credentials; `BYBIT_API_KEY` and `BYBIT_API_SECRET` are placeholders for future account-specific features.
+
+## Temporary login
+
+- Username: `admin`
+- Password: `123admin`
+
+The API hashes the configured password before storing the administrator in PostgreSQL. Change `ADMIN_PASSWORD` and `JWT_SECRET` in `.env` before any deployment.
 
 ## Quality checks
 

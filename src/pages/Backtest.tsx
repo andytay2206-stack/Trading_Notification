@@ -3,6 +3,7 @@ import { CandleChart } from '../components/CandleChart'
 import { formatCurrency } from '../lib/currency'
 import { randomHistoricalEnd, runEmaBacktest, type BacktestConfig, type BacktestResult } from '../lib/backtest'
 import { fetchCandles } from '../services/bybit'
+import { saveBacktestRun } from '../services/api'
 import type { Candle, CandleInterval } from '../types'
 
 const intervalOptions: Array<{ value: CandleInterval; label: string }> = [
@@ -37,8 +38,10 @@ export function Backtest() {
         limit: config.candleCount,
         end: randomHistoricalEnd(),
       })
+      const backtestResult = runEmaBacktest(historicalCandles, config)
+      await saveBacktestRun(config, backtestResult, historicalCandles)
       setCandles(historicalCandles)
-      setResult(runEmaBacktest(historicalCandles, config))
+      setResult(backtestResult)
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : 'The historical candle request failed')
     } finally {
