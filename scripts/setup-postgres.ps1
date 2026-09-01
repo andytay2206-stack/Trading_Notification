@@ -28,7 +28,7 @@ try {
     & $psql -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -c "SELECT version();"
     if ($LASTEXITCODE -ne 0) { throw 'Could not authenticate as the postgres administrator.' }
 
-    $roleExists = & $psql -h localhost -p 5432 -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname = 'northstar';"
+    [string]$roleExists = & $psql -h localhost -p 5432 -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname = 'northstar';"
     if ($roleExists.Trim() -eq '1') {
         & $psql -h localhost -p 5432 -U postgres -d postgres -v ON_ERROR_STOP=1 -c "ALTER ROLE northstar WITH LOGIN PASSWORD 'northstar';"
     } else {
@@ -36,7 +36,7 @@ try {
     }
     if ($LASTEXITCODE -ne 0) { throw 'Could not create or update the northstar role.' }
 
-    $databaseExists = & $psql -h localhost -p 5432 -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'northstar';"
+    [string]$databaseExists = & $psql -h localhost -p 5432 -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'northstar';"
     if ($databaseExists.Trim() -ne '1') {
         & $createdb -h localhost -p 5432 -U postgres -O northstar northstar
         if ($LASTEXITCODE -ne 0) { throw 'Could not create the northstar database.' }
