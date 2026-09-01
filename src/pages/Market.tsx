@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CandleChart } from '../components/CandleChart'
 import { fetchCandles, subscribeToCandles } from '../services/bybit'
+import { alignedOneMinuteSetups, analyzeStructure } from '../lib/structureStrategy'
 import type { Candle, CandleInterval } from '../types'
 
 const intervals: Array<{ value: CandleInterval; label: string }> = [
@@ -24,6 +25,7 @@ export function Market() {
   const [error, setError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [fifteenMinuteCandles, setFifteenMinuteCandles] = useState<Candle[]>([])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -67,9 +69,23 @@ export function Market() {
     }
   }, [interval, reloadKey])
 
+  useEffect(() => {
+    const controller = new AbortController()
+    const loadBias = () => fetchCandles('15', controller.signal, { limit: 500 }).then(setFifteenMinuteCandles).catch(() => undefined)
+    void loadBias()
+    const timer = window.setInterval(() => void loadBias(), 60_000)
+    return () => {
+      controller.abort()
+      window.clearInterval(timer)
+    }
+  }, [])
+
   const latest = candles.at(-1)
   const previous = candles.at(-2)
   const change = useMemo(() => latest && previous ? ((latest.close - previous.close) / previous.close) * 100 : 0, [latest, previous])
+  const analysis = useMemo(() => analyzeStructure(candles.filter((candle) => candle.confirmed)), [candles])
+  const fifteenMinuteAnalysis = useMemo(() => analyzeStructure(fifteenMinuteCandles.filter((candle) => candle.confirmed)), [fifteenMinuteCandles])
+  const alignedSetups = useMemo(() => interval === '1' ? alignedOneMinuteSetups(analysis, fifteenMinuteAnalysis) : [], [analysis, fifteenMinuteAnalysis, interval])
 
   return (
     <main>
@@ -104,9 +120,15 @@ export function Market() {
             {intervals.map((item) => <button type="button" className={interval === item.value ? 'active' : ''} key={item.value} onClick={() => setInterval(item.value)}>{item.label}</button>)}
             <span className="last-update">{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : 'Waiting for data'}</span>
           </div>
+          <div className="indicator-legend">
+            <span><i className="trend-up" />Swing structure</span>
+            <span><i className="choch-dot" />CHoCH</span>
+            <span><i className="fvg-line" />Fair value gap</span>
+            <b className={fifteenMinuteAnalysis.bias === 'long' ? 'positive' : fifteenMinuteAnalysis.bias === 'short' ? 'negative' : ''}>15m bias: {fifteenMinuteAnalysis.bias}</b>
+          </div>
           {error && candles.length === 0
             ? <div className="chart-error"><b>Market data unavailable</b><span>{error}. Check the connection and retry.</span><button type="button" className="secondary-button" onClick={() => setReloadKey((key) => key + 1)}>Retry feed</button></div>
-            : candles.length ? <CandleChart candles={candles} /> : <div className="chart-loading"><i /><span>Loading Bybit candles…</span></div>}
+            : candles.length ? <CandleChart candles={candles} analysis={analysis} /> : <div className="chart-loading"><i /><span>Loading Bybit candles…</span></div>}
         </div>
 
         <aside className="trade-rail">
@@ -114,8 +136,9 @@ export function Market() {
             <div className="signal-heading"><span className="radar-icon">⌁</span><span className="pill">Strategy pending</span></div>
             <div className="overline">Signal monitor</div>
             <h2>Watching the market</h2>
-            <p>Your notification parameters have not been configured yet. Once supplied, qualifying setups will appear here and be tracked candle by candle.</p>
-            <div className="signal-placeholder"><i /><span>Awaiting strategy rules</span></div>
+            <p>Tracking structural CHoCH and fair value gap pullbacks. A 1-minute setup is valid only when aligned with the 15-minute bias.</p>
+            <div className="strategy-direction"><span>15m direction</span><b className={fifteenMinuteAnalysis.bias === 'long' ? 'positive' : fifteenMinuteAnalysis.bias === 'short' ? 'negative' : ''}>{fifteenMinuteAnalysis.bias}</b></div>
+            <div className="strategy-direction"><span>Aligned 1m FVGs</span><b>{interval === '1' ? alignedSetups.length : 'Select 1m'}</b></div>
           </article>
 
           <article className="panel market-details">

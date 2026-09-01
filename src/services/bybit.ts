@@ -25,6 +25,8 @@ interface CandleRequest {
   end?: number
 }
 
+const intervalSeconds = (interval: CandleInterval) => interval === 'D' ? 86_400 : Number(interval) * 60
+
 export async function fetchCandles(interval: CandleInterval, signal?: AbortSignal, request: CandleRequest = {}): Promise<Candle[]> {
   const params = new URLSearchParams({
     category: 'linear',
@@ -46,7 +48,7 @@ export async function fetchCandles(interval: CandleInterval, signal?: AbortSigna
     low: Number(low),
     close: Number(close),
     volume: Number(volume),
-    confirmed: Number(time) < Date.now() - 1_000,
+    confirmed: Number(time) / 1000 + intervalSeconds(interval) <= Date.now() / 1000,
   })).reverse()
 }
 
