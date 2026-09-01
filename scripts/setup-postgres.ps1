@@ -2,7 +2,11 @@ $ErrorActionPreference = 'Stop'
 
 $postgresRoot = 'C:\Program Files\PostgreSQL'
 $versionDirectory = Get-ChildItem -LiteralPath $postgresRoot -Directory -ErrorAction Stop |
-    Sort-Object { [version]$_.Name } -Descending |
+    Where-Object { $_.Name -match '^\d+(\.\d+)?$' } |
+    Sort-Object {
+        $parts = $_.Name.Split('.')
+        ([int]$parts[0] * 1000) + $(if ($parts.Count -gt 1) { [int]$parts[1] } else { 0 })
+    } -Descending |
     Select-Object -First 1
 
 if (-not $versionDirectory) {
@@ -47,4 +51,3 @@ try {
     $env:PGPASSWORD = $null
     [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPointer)
 }
-
