@@ -31,6 +31,16 @@ docker compose up -d postgres
 npm run dev
 ```
 
+For a native Windows PostgreSQL installation, initialize the project database once from PowerShell:
+
+```bash
+npm run db:setup
+npm run db:check
+npm run dev
+```
+
+`db:setup` detects the newest PostgreSQL installation and securely prompts for the `postgres` administrator password chosen during installation. It creates the `northstar` role and database expected by `.env`; the password is not saved or printed. The API creates its application tables on first startup.
+
 Open the local address printed by Vite (normally `http://localhost:5173`).
 
 The API starts on port 3001 and the interface starts on port 5173. During local development, Vite proxies `/api` to Node. Node uses the `bybit-api` SDK for both REST candles and WebSocket events; the browser receives live events through a same-origin server-sent-event stream. A REST refresh every 10 seconds remains as a fallback.
