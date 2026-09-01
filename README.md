@@ -47,6 +47,8 @@ The API starts on port 3001 and the interface starts on port 5173. During local 
 
 The local `.env` file is intentionally ignored by Git. Copy `.env.example` when setting up another machine. Public candles do not need Bybit credentials; `BYBIT_API_KEY` and `BYBIT_API_SECRET` are placeholders for future account-specific features.
 
+If the API reports that it cannot reach Bybit, first stop every existing development process with `Ctrl+C` and restart `npm run dev`. Vite now requires port 5173 instead of silently selecting a different port. If the default Bybit host is unavailable in the user's region, set `BYBIT_API_REGION=bytick` in `.env` and restart; leave explicit URL overrides empty unless a supported regional Bybit endpoint is required.
+
 ## Temporary login
 
 - Username: `admin`

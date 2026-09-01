@@ -3,7 +3,7 @@ import cookieParser from 'cookie-parser'
 import express from 'express'
 import helmet from 'helmet'
 import { createSession, requireAuth, SESSION_COOKIE } from './auth.js'
-import { restClient, subscribeToKline } from './bybit.js'
+import { describeBybitError, restClient, subscribeToKline } from './bybit.js'
 import { config } from './config.js'
 import { closeDatabase, initializeDatabase, pool } from './db.js'
 
@@ -76,7 +76,7 @@ app.get('/api/market/candles', async (request, response) => {
     if (payload.retCode !== 0) return response.status(502).json({ error: payload.retMsg || 'Bybit rejected the request' })
     return response.json(payload)
   } catch (cause) {
-    console.error('[bybit rest]', cause)
+    console.error('[bybit rest]', describeBybitError(cause))
     return response.status(502).json({ error: 'Unable to reach Bybit through the server' })
   }
 })

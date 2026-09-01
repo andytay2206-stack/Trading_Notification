@@ -16,4 +16,7 @@ export const config = {
   bybitApiKey: process.env.BYBIT_API_KEY || undefined,
   bybitApiSecret: process.env.BYBIT_API_SECRET || undefined,
   bybitTestnet: process.env.BYBIT_TESTNET === 'true',
+  bybitApiRegion: process.env.BYBIT_API_REGION || 'default',
+  bybitBaseUrl: process.env.BYBIT_BASE_URL || undefined,
+  bybitWsUrl: process.env.BYBIT_WS_URL || undefined,
 }
