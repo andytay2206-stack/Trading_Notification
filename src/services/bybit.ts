@@ -1,6 +1,8 @@
 import type { Candle, CandleInterval } from '../types'
 
-const REST_URL = 'https://api.bybit.com/v5/market/kline'
+const REST_URL = import.meta.env.DEV
+  ? '/bybit-api/v5/market/kline'
+  : (import.meta.env.VITE_BYBIT_REST_URL ?? 'https://api.bybit.com/v5/market/kline')
 const WS_URL = 'wss://stream.bybit.com/v5/public/linear'
 
 interface BybitKlineResponse {
@@ -24,8 +26,19 @@ interface BybitSocketMessage {
   }>
 }
 
-export async function fetchCandles(interval: CandleInterval, signal?: AbortSignal): Promise<Candle[]> {
-  const params = new URLSearchParams({ category: 'linear', symbol: 'BTCUSDT', interval, limit: '300' })
+interface CandleRequest {
+  limit?: number
+  end?: number
+}
+
+export async function fetchCandles(interval: CandleInterval, signal?: AbortSignal, request: CandleRequest = {}): Promise<Candle[]> {
+  const params = new URLSearchParams({
+    category: 'linear',
+    symbol: 'BTCUSDT',
+    interval,
+    limit: String(request.limit ?? 300),
+  })
+  if (request.end) params.set('end', String(request.end))
   const response = await fetch(`${REST_URL}?${params}`, { signal })
   if (!response.ok) throw new Error(`Bybit returned HTTP ${response.status}`)
 
@@ -39,7 +52,7 @@ export async function fetchCandles(interval: CandleInterval, signal?: AbortSigna
     low: Number(low),
     close: Number(close),
     volume: Number(volume),
-    confirmed: true,
+    confirmed: Number(time) < Date.now() - 1_000,
   })).reverse()
 }
 

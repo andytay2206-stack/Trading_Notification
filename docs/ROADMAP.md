@@ -6,6 +6,9 @@
 - R-based statistics
 - Currency display selection
 - Live Bybit BTC perpetual chart
+- Sidebar navigation
+- Resilient WebSocket plus REST-polling market feed
+- Random-window demo backtesting engine
 
 ## Phase 2 — Strategy specification
 
@@ -14,6 +17,7 @@
 - Define long and short entry conditions
 - Define stop-loss, target, invalidation, and expiry rules
 - Create executable examples and edge-case tests before enabling signals
+- Replace the demonstration EMA strategy in both backtesting and live monitoring
 
 ## Phase 3 — Signal and virtual trade tracking
 
@@ -36,4 +40,3 @@
 - Add a database and secret management
 - Monitor market-feed connectivity and worker health
 - Back up and export the trade journal
-

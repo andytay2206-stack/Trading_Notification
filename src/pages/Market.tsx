@@ -9,13 +9,21 @@ const intervals: Array<{ value: CandleInterval; label: string }> = [
   { value: '240', label: '4H' }, { value: 'D', label: '1D' },
 ]
 
-type ConnectionStatus = 'connecting' | 'live' | 'offline'
+type ConnectionStatus = 'connecting' | 'live' | 'polling' | 'offline'
+
+const mergeCandles = (current: Candle[], incoming: Candle[]) => {
+  const merged = new Map(current.map((candle) => [candle.time, candle]))
+  incoming.forEach((candle) => merged.set(candle.time, candle))
+  return [...merged.values()].sort((a, b) => a.time - b.time).slice(-300)
+}
 
 export function Market() {
   const [interval, setInterval] = useState<CandleInterval>('15')
   const [candles, setCandles] = useState<Candle[]>([])
   const [status, setStatus] = useState<ConnectionStatus>('connecting')
   const [error, setError] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -23,12 +31,21 @@ export function Market() {
     setError(null)
     setStatus('connecting')
 
-    fetchCandles(interval, controller.signal)
-      .then(setCandles)
+    const refresh = (initial = false) => fetchCandles(interval, controller.signal, { limit: initial ? 300 : 3 })
+      .then((incoming) => {
+        setCandles((current) => initial ? incoming : mergeCandles(current, incoming))
+        setError(null)
+        setLastUpdated(new Date())
+        setStatus((current) => current === 'live' ? 'live' : 'polling')
+      })
       .catch((cause: unknown) => {
         if (cause instanceof DOMException && cause.name === 'AbortError') return
         setError(cause instanceof Error ? cause.message : 'Could not load Bybit candles')
+        setStatus('offline')
       })
+
+    void refresh(true)
+    const pollTimer = window.setInterval(() => void refresh(), 10_000)
 
     const unsubscribe = subscribeToCandles(interval, (incoming) => {
       setCandles((current) => {
@@ -37,13 +54,18 @@ export function Market() {
         if (incoming.time === last.time) return [...current.slice(0, -1), incoming]
         return current
       })
-    }, setStatus)
+      setLastUpdated(new Date())
+    }, (socketStatus) => {
+      if (socketStatus === 'live') setStatus('live')
+      if (socketStatus === 'connecting') setStatus('connecting')
+    })
 
     return () => {
       controller.abort()
+      window.clearInterval(pollTimer)
       unsubscribe()
     }
-  }, [interval])
+  }, [interval, reloadKey])
 
   const latest = candles.at(-1)
   const previous = candles.at(-2)
@@ -57,7 +79,7 @@ export function Market() {
           <h1>Bitcoin <span>Perpetual.</span></h1>
           <p>Real-time public market data from Bybit. No trading account is connected.</p>
         </div>
-        <div className={`connection ${status}`}><i />{status === 'live' ? 'Live feed' : status === 'connecting' ? 'Connecting' : 'Offline'}</div>
+        <div className={`connection ${status}`}><i />{status === 'live' ? 'WebSocket live' : status === 'polling' ? 'REST live' : status === 'connecting' ? 'Connecting' : 'Offline'}</div>
       </section>
 
       <section className="market-workspace">
@@ -80,8 +102,11 @@ export function Market() {
           </div>
           <div className="interval-bar">
             {intervals.map((item) => <button type="button" className={interval === item.value ? 'active' : ''} key={item.value} onClick={() => setInterval(item.value)}>{item.label}</button>)}
+            <span className="last-update">{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : 'Waiting for data'}</span>
           </div>
-          {error ? <div className="chart-error"><b>Market data unavailable</b><span>{error}. Check the connection and retry.</span></div> : candles.length ? <CandleChart candles={candles} /> : <div className="chart-loading"><i /><span>Loading Bybit candles…</span></div>}
+          {error && candles.length === 0
+            ? <div className="chart-error"><b>Market data unavailable</b><span>{error}. Check the connection and retry.</span><button type="button" className="secondary-button" onClick={() => setReloadKey((key) => key + 1)}>Retry feed</button></div>
+            : candles.length ? <CandleChart candles={candles} /> : <div className="chart-loading"><i /><span>Loading Bybit candles…</span></div>}
         </div>
 
         <aside className="trade-rail">
