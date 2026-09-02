@@ -8,6 +8,7 @@
     "dev:web": "vite",
     "dev:api": "tsx watch server/index.ts",
     "start": "tsx server/index.ts",
+    "start:prod": "tsx server/index.ts",
     "db:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-postgres.ps1",
     "db:check": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-postgres.ps1",
     "db:reset-data": "tsx scripts/reset-trading-data.ts",

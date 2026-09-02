@@ -6,6 +6,12 @@ import { pool } from './db.js'
 import type { FairValueGap } from '../src/lib/structureStrategy.js'
 
 const STRATEGY_VERSION = 'structure-v7'
+interface StrategyScanResult {
+  scanned: number
+  bias: 'long' | 'short' | 'neutral'
+  startedAt: Date
+}
+const activeScans = new Map<string, Promise<StrategyScanResult>>()
 
 export async function getStrategyRuntime(userId: string) {
   const result = await pool.query<{ started_at: Date }>(
@@ -82,7 +88,7 @@ async function reconcileExistingPredictions(userId: string, setups: FairValueGap
   }
 }
 
-export async function scanStrategy(userId: string) {
+async function performStrategyScan(userId: string): Promise<StrategyScanResult> {
   const [oneMinuteCandles, fifteenMinuteCandles] = await Promise.all([
     loadCandles('1', 1000),
     loadCandles('15', 500),
@@ -125,6 +131,19 @@ export async function scanStrategy(userId: string) {
   }
 
   return { scanned: setups.length, bias: fifteenMinute.bias, startedAt: runtime.startedAt }
+}
+
+export function scanStrategy(userId: string) {
+  const active = activeScans.get(userId)
+  if (active) return active
+
+  const scan = performStrategyScan(userId)
+  activeScans.set(userId, scan)
+  const clear = () => {
+    if (activeScans.get(userId) === scan) activeScans.delete(userId)
+  }
+  void scan.then(clear, clear)
+  return scan
 }
 
 export async function decideNotification(userId: string, notificationId: string, decision: 'accepted' | 'dismissed') {

@@ -7,6 +7,7 @@ import { describeBybitError, restClient, subscribeToKline } from './bybit.js'
 import { config } from './config.js'
 import { closeDatabase, initializeDatabase, pool } from './db.js'
 import { decideNotification, getStrategyRuntime, scanStrategy } from './strategy.js'
+import { startStrategyWorker } from './worker.js'
 
 const app = express()
 const allowedIntervals = new Set(['1', '3', '5', '15', '30', '60', '120', '240', '360', '720', 'D', 'W', 'M'])
@@ -190,8 +191,12 @@ app.use((error: unknown, _request: express.Request, response: express.Response, 
 async function start() {
   await initializeDatabase()
   const server = app.listen(config.port, () => console.log(`Northstar API listening on http://localhost:${config.port}`))
+  const stopStrategyWorker = startStrategyWorker()
 
-  const shutdown = () => server.close(() => void closeDatabase().finally(() => process.exit(0)))
+  const shutdown = () => {
+    stopStrategyWorker()
+    server.close(() => void closeDatabase().finally(() => process.exit(0)))
+  }
   process.on('SIGINT', shutdown)
   process.on('SIGTERM', shutdown)
 }

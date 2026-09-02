@@ -1,0 +1,10 @@
+.git
+.github
+.codex-notes
+.vercel
+node_modules
+dist
+.env
+.env.*
+*.log
+*.tsbuildinfo

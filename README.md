@@ -77,6 +77,7 @@ This executes unit tests for performance calculations and creates a production b
 
 - [Architecture and data flow](docs/ARCHITECTURE.md)
 - [Strategy rules and assumptions](docs/STRATEGY.md)
+- [Railway and Vercel deployment](docs/DEPLOYMENT.md)
 - [Product roadmap](docs/ROADMAP.md)
 
 ## Backtesting status

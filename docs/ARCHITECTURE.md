@@ -62,6 +62,8 @@ Pending signals carry a strategy version. `structure-v7` identifies the predicti
 
 The chart, server scanner, notification outcomes, and backtester all consume the same strategy implementation.
 
+In production, an in-process Railway worker scans all application users sequentially every 60 seconds. The next cycle is scheduled only after the current cycle finishes, so a slow Bybit response cannot stack worker cycles. A per-user in-flight lock also makes a simultaneous dashboard refresh share the active scan instead of duplicating it. Browser-triggered scans remain available for an immediate refresh but are no longer required for lifecycle tracking. Vercel serves the frontend and reverse-proxies same-origin `/api/*` traffic to the Railway service.
+
 ## Notification decisions
 
 The server scans 500 closed 15-minute candles and 1,000 closed 1-minute candles. Version-7 one-minute setups are processed chronologically through the same slot used by the chart and deduplicated in PostgreSQL. The dashboard separates waiting/active pullback predictions from finished history. After a filled setup reaches stop or target, the user may optionally record whether it was personally taken:
