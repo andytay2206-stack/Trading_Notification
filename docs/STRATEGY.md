@@ -36,7 +36,8 @@ The structural leg from the invalidation swing through the CHoCH must contain a 
 - Bullish FVG: the following candle's low is above the preceding candle's high.
 - Bearish FVG: the following candle's high is below the preceding candle's low.
 - An FVG established at least one full closed candle before CHoCH is preferred. If several qualify, the widest gap is the most relevant displacement zone and a tie uses the nearest gap. If none was already established, a valid CHoCH-centered FVG may be used after its third candle closes.
-- Entry is the 50% midpoint between the two FVG boundaries.
+- The 50% midpoint between the two FVG boundaries becomes a predicted entry line only after both CHoCH and the complete three-candle FVG are confirmed.
+- Entry occurs only when a later one-minute candle returns to and touches that midpoint. A candle used to form the CHoCH or FVG can never retroactively fill the trade.
 - No newer setup is considered while the selected setup is waiting for entry or active after entry.
 
 In the 06:39 long example, the preferred established FVG is 06:34/06:35/06:36. Its boundaries are 77,490.6 and 77,500.0, giving a midpoint entry of 77,495.3. The 06:34 invalidation wick is 77,408.3 and the buffered stop is 77,404.2. The earlier 01:27 example remains valid when no earlier established FVG exists and the CHoCH candle itself is the middle displacement candle.
@@ -51,6 +52,7 @@ This is the current precise interpretation of the requested gap inside the CHoCH
 - Target is exactly `4R` from entry.
 - If one candle contains both stop and target, the engine records the stop first (`−1R`) because candle data cannot reveal intrabar ordering.
 - A filled trade has no candle timeout. It remains active until its stop or target is reached.
+- An unfilled prediction remains valid for 60 subsequent one-minute candles. A touch on the 60th candle is accepted; if that candle also misses, the prediction is cancelled at `0R` and the setup slot becomes available.
 - If price reaches the target before returning to the midpoint entry, the prediction is closed as `missed`/`skipped` at `0R`. It is not counted as a trade, win, or loss because no post-CHoCH entry occurred.
 - The USD value of `1R` defaults to `STRATEGY_RISK_USD=100` in `.env`.
 
@@ -65,7 +67,7 @@ The notification board contains only waiting pullback predictions and active ent
 - Check means the user took the trade; the result enters portfolio statistics and history.
 - Cross means the user did not take the trade; it remains in signal history but does not affect portfolio statistics.
 - The automatic strategy win rate counts the result even when neither button is used. Check/Cross affects only the personal portfolio statistics.
-- Cancellations shown in history are preserved legacy records from the previous lifecycle and are not created by version 6.
+- Version-7 waiting predictions that expire are shown in history as cancelled at `0R`; they do not affect strategy or portfolio win rate.
 
 ## Chart display policy
 

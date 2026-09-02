@@ -94,6 +94,48 @@ describe('market structure strategy', () => {
     expect(setup?.rResult).toBe(0)
   })
 
+  it('uses only a later candle return as the entry after CHoCH confirms the prediction', () => {
+    const analysis = analyzeStructure(bullishSequence, {
+      pivotLength: 1, stopBufferPercent: 5, rewardRisk: 4, maxEntryWaitCandles: 60,
+    })
+    const setup = analysis.fairValueGaps.find((gap) => gap.direction === 'long')
+
+    expect(setup?.choch.index).toBe(9)
+    expect(setup?.midpoint).toBe(9.35)
+    expect(setup?.entryTime).toBe(bullishSequence[11].time)
+    expect(setup?.entryTime).toBeGreaterThan(setup?.choch.time ?? 0)
+  })
+
+  it('cancels an unfilled prediction at 0R after its full waiting window', () => {
+    const data = [...bullishSequence]
+    for (let index = 11; index <= 13; index += 1) data[index] = candle(index, 10, 10.2, 9.6, 10)
+    const analysis = analyzeStructure(data, {
+      pivotLength: 1, stopBufferPercent: 5, rewardRisk: 4, maxEntryWaitCandles: 3,
+    })
+    const setup = analysis.fairValueGaps.find((gap) => gap.direction === 'long')
+
+    expect(setup?.status).toBe('cancelled')
+    expect(setup?.entryTime).toBeUndefined()
+    expect(setup?.exitTime).toBe(data[13].time)
+    expect(setup?.exitPrice).toBeUndefined()
+    expect(setup?.rResult).toBe(0)
+  })
+
+  it('still fills when price returns on the final candle of the waiting window', () => {
+    const data = [...bullishSequence]
+    data[11] = candle(11, 10, 10.2, 9.6, 10)
+    data[12] = candle(12, 10, 10.2, 9.6, 10)
+    data[13] = candle(13, 10, 10.1, 9.3, 9.8)
+    const analysis = analyzeStructure(data, {
+      pivotLength: 1, stopBufferPercent: 5, rewardRisk: 4, maxEntryWaitCandles: 3,
+    })
+    const setup = analysis.fairValueGaps.find((gap) => gap.direction === 'long')
+
+    expect(setup?.status).toBe('filled')
+    expect(setup?.entryTime).toBe(data[13].time)
+    expect(setup?.exitTime).toBeUndefined()
+  })
+
   it('ignores later setups until the selected setup has finished', () => {
     const setup = (time: number, exitTime?: number) => ({ choch: { time }, exitTime })
     const selected = oneSetupAtATime([

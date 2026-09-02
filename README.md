@@ -18,11 +18,11 @@ Northstar is a notification-first futures monitor. A React interface talks to a 
 - Random historical-window backtesting with win rate, profit, net R, and drawdown results
 - Login-protected workspace with an HTTP-only session cookie and sidebar logout
 - PostgreSQL storage for users, trades, performance snapshots, and completed backtests
-- Automated strategy indicators on a navigable TradingView Lightweight Charts view, with one setup slot that remains occupied until entry/TP/SL resolution
+- Automated strategy indicators on a navigable TradingView Lightweight Charts view, with one setup slot and a 60-minute pullback-entry window
 - Timestamp-aligned 15-minute context alongside complete one-minute setup tracking
 - Pullback prediction board, automatic strategy win rate, and separate accepted/skipped/finished history
 
-Strategy win rate is calculated automatically from every filled version-6 setup that reaches TP or SL. Portfolio metrics remain separate and include only completed notifications that the user confirms were taken. Currency conversions use indicative fixed rates until a live foreign-exchange provider is selected.
+Strategy win rate is calculated automatically from every filled version-7 setup that reaches TP or SL. Portfolio metrics remain separate and include only completed notifications that the user confirms were taken. Currency conversions use indicative fixed rates until a live foreign-exchange provider is selected.
 
 ## Run locally
 
@@ -81,7 +81,7 @@ This executes unit tests for performance calculations and creates a production b
 
 ## Backtesting status
 
-The backtester uses the same structural strategy as the live scanner: timestamped 15-minute context, 1-minute CHoCH, the most relevant established three-candle FVG midpoint entry, a stop near the latest opposing swing wick with a 5% full-range buffer, and a 4R target. Each run randomly selects a historical endpoint between two days and two years ago and loads 500, 800, or 1,000 candles plus structural warm-up data. A filled setup remains open until TP or SL; a target reached before the pullback entry is classified as missed and excluded from win rate. Select any completed journal trade to inspect its levels. Fees, funding, slippage, and spread are not included.
+The backtester uses the same structural strategy as the live scanner: timestamped 15-minute context, 1-minute CHoCH, the most relevant established three-candle FVG midpoint prediction, a stop near the latest opposing swing wick with a 5% full-range buffer, and a 4R target. Entry occurs only when a later candle returns to the midpoint. The prediction is cancelled at 0R if all 60 subsequent one-minute candles miss it; once filled, it remains open until TP or SL. A target reached before the pullback entry is classified as missed and excluded from win rate. Each run randomly selects a historical endpoint between two days and two years ago and loads 500, 800, or 1,000 candles plus structural warm-up data. Select any completed journal trade to inspect its levels. Fees, funding, slippage, and spread are not included.
 
 ## Development workflow
 

@@ -46,12 +46,14 @@ export interface StrategySettings {
   pivotLength: number
   stopBufferPercent: number
   rewardRisk: number
+  maxEntryWaitCandles?: number
 }
 
 export const defaultStructureSettings: StrategySettings = {
   pivotLength: 2,
   stopBufferPercent: 5,
   rewardRisk: 4,
+  maxEntryWaitCandles: 60,
 }
 
 export function findSwingPoints(candles: Candle[], pivotLength = 2): SwingPoint[] {
@@ -202,7 +204,11 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
       status: 'open',
     }
 
+    // The midpoint is a prediction made only after CHoCH and the complete FVG
+    // are known. Historical candles that formed either condition can never
+    // retroactively fill the entry.
     const evaluationStart = Math.max(choch.index + 1, middleIndex + 2)
+    const entryExpiryIndex = evaluationStart + (settings.maxEntryWaitCandles ?? 60) - 1
     for (let index = evaluationStart; index < candles.length; index += 1) {
       const candle = candles[index]
       if (!gap.entryTime) {
@@ -220,6 +226,12 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
         if (touchedEntry) {
           gap.entryTime = candle.time
           gap.status = 'filled'
+        }
+        if (!gap.entryTime && index >= entryExpiryIndex) {
+          gap.status = 'cancelled'
+          gap.exitTime = candle.time
+          gap.rResult = 0
+          break
         }
         if (!gap.entryTime) continue
       }

@@ -5,7 +5,7 @@ import { config } from './config.js'
 import { pool } from './db.js'
 import type { FairValueGap } from '../src/lib/structureStrategy.js'
 
-const STRATEGY_VERSION = 'structure-v6'
+const STRATEGY_VERSION = 'structure-v7'
 
 export async function getStrategyRuntime(userId: string) {
   const result = await pool.query<{ started_at: Date }>(
@@ -48,6 +48,17 @@ const outcomeFor = (setup: FairValueGap) => {
   return { outcome: 'waiting', rResult: 0 }
 }
 
+async function expireStaleUnfilledPredictions(userId: string) {
+  await pool.query(
+    `UPDATE trade_notifications SET
+       outcome = 'cancelled', exit_time = detected_at + INTERVAL '1 hour',
+       r_result = 0, updated_at = NOW()
+     WHERE user_id = $1 AND outcome = 'waiting' AND entry_time IS NULL
+       AND detected_at <= NOW() - INTERVAL '62 minutes'`,
+    [userId],
+  )
+}
+
 async function reconcileExistingPredictions(userId: string, setups: FairValueGap[]) {
   const pending = await pool.query<{ id: string; signal_key: string }>(
     `SELECT id, signal_key FROM trade_notifications
@@ -58,7 +69,7 @@ async function reconcileExistingPredictions(userId: string, setups: FairValueGap
   for (const notification of pending.rows) {
     const setupId = notification.signal_key.slice(notification.signal_key.indexOf(':') + 1)
     const setup = byId.get(setupId)
-    if (!setup || !['won', 'lost', 'missed'].includes(setup.status)) continue
+    if (!setup || !['won', 'lost', 'missed', 'cancelled'].includes(setup.status)) continue
     const result = outcomeFor(setup)
     await pool.query(
       `UPDATE trade_notifications SET
@@ -79,6 +90,7 @@ export async function scanStrategy(userId: string) {
   const oneMinute = analyzeStructure(oneMinuteCandles.filter((candle) => candle.confirmed))
   const fifteenMinute = analyzeStructure(fifteenMinuteCandles.filter((candle) => candle.confirmed))
   await reconcileExistingPredictions(userId, oneMinute.fairValueGaps)
+  await expireStaleUnfilledPredictions(userId)
   const runtime = await getStrategyRuntime(userId)
   const startedAtSeconds = runtime.startedAt.getTime() / 1000
   const eligible = oneMinute.fairValueGaps

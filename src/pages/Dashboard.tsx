@@ -16,7 +16,8 @@ const signedR = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(1)}R
 const needsDecision = (notification: StrategyNotification) => notification.outcome === 'win'
   || notification.outcome === 'loss'
   || (notification.outcome === 'cancelled' && notification.entry_time !== null)
-const isPrediction = (notification: StrategyNotification) => notification.strategy_version === 'structure-v6'
+const CURRENT_STRATEGY_VERSION = 'structure-v7'
+const isPrediction = (notification: StrategyNotification) => notification.strategy_version === CURRENT_STRATEGY_VERSION
   && (notification.outcome === 'waiting' || notification.outcome === 'active')
 const isFinished = (notification: StrategyNotification) => ['win', 'loss', 'missed', 'cancelled'].includes(notification.outcome)
 
@@ -63,7 +64,7 @@ export function Dashboard({ currency, onCurrencyChange, onOpenMarket }: Dashboar
   const recentTrades = [...trades].sort((a, b) => (b.closedAt ?? b.openedAt).localeCompare(a.closedAt ?? a.openedAt)).slice(0, 5)
   const predictions = notifications.filter(isPrediction)
   const historyNotifications = notifications.filter(isFinished)
-  const strategyFinished = notifications.filter((item) => item.strategy_version === 'structure-v6'
+  const strategyFinished = notifications.filter((item) => item.strategy_version === CURRENT_STRATEGY_VERSION
     && (item.outcome === 'win' || item.outcome === 'loss'))
   const strategyWins = strategyFinished.filter((item) => item.outcome === 'win').length
   const strategyLosses = strategyFinished.length - strategyWins
@@ -162,7 +163,7 @@ export function Dashboard({ currency, onCurrencyChange, onOpenMarket }: Dashboar
       </section>
 
       <section className="panel signal-history">
-        <div className="panel-heading"><div><div className="overline">Finished trade history</div><h2>Accepted, skipped, finished, and legacy cancelled</h2></div><span className="muted">Strategy result is automatic · decisions only affect portfolio</span></div>
+        <div className="panel-heading"><div><div className="overline">Finished trade history</div><h2>Accepted, skipped, finished, and cancelled</h2></div><span className="muted">Strategy result is automatic · decisions only affect portfolio</span></div>
         {historyNotifications.length === 0
           ? <div className="notice-empty">Finished strategy setups will appear here automatically.</div>
           : <div className="trade-table">
