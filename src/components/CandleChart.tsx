@@ -241,48 +241,58 @@ export function CandleChart({
       const setupLabel = setupTimeLabel(activeSetup.choch.time)
       const bandStart = (activeSetup.entryTime ?? activeSetup.startTime) as Time
       const bandEnd = (showResolvedSetups && activeSetup.exitTime ? activeSetup.exitTime : activeSetup.endTime) as Time
-      const rewardBand = chart.addSeries(BaselineSeries, {
-        baseValue: { type: 'price', price: activeSetup.midpoint },
-        relativeGradient: true,
-        topFillColor1: 'rgba(38, 166, 154, .24)',
-        topFillColor2: 'rgba(38, 166, 154, .09)',
-        topLineColor: 'rgba(57, 217, 138, 0)',
-        bottomFillColor1: 'rgba(38, 166, 154, .09)',
-        bottomFillColor2: 'rgba(38, 166, 154, .24)',
-        bottomLineColor: 'rgba(57, 217, 138, 0)',
-        lineWidth: 1,
-        lastValueVisible: false,
-        priceLineVisible: false,
-      })
-      rewardBand.setData([
-        { time: bandStart, value: activeSetup.targetPrice },
-        { time: bandEnd, value: activeSetup.targetPrice },
-      ])
-      overlaySeriesRef.current.push(rewardBand)
+      const showTradeLevels = showResolvedSetups || activeSetup.status === 'filled'
+      if (showTradeLevels) {
+        const rewardBand = chart.addSeries(BaselineSeries, {
+          baseValue: { type: 'price', price: activeSetup.midpoint },
+          relativeGradient: true,
+          topFillColor1: 'rgba(38, 166, 154, .24)',
+          topFillColor2: 'rgba(38, 166, 154, .09)',
+          topLineColor: 'rgba(57, 217, 138, 0)',
+          bottomFillColor1: 'rgba(38, 166, 154, .09)',
+          bottomFillColor2: 'rgba(38, 166, 154, .24)',
+          bottomLineColor: 'rgba(57, 217, 138, 0)',
+          lineWidth: 1,
+          lastValueVisible: false,
+          priceLineVisible: false,
+        })
+        rewardBand.setData([
+          { time: bandStart, value: activeSetup.targetPrice },
+          { time: bandEnd, value: activeSetup.targetPrice },
+        ])
+        overlaySeriesRef.current.push(rewardBand)
 
-      const riskBand = chart.addSeries(BaselineSeries, {
-        baseValue: { type: 'price', price: activeSetup.midpoint },
-        relativeGradient: true,
-        topFillColor1: 'rgba(239, 83, 80, .24)',
-        topFillColor2: 'rgba(239, 83, 80, .09)',
-        topLineColor: 'rgba(255, 92, 108, 0)',
-        bottomFillColor1: 'rgba(239, 83, 80, .09)',
-        bottomFillColor2: 'rgba(239, 83, 80, .24)',
-        bottomLineColor: 'rgba(255, 92, 108, 0)',
-        lineWidth: 1,
-        lastValueVisible: false,
-        priceLineVisible: false,
-      })
-      riskBand.setData([
-        { time: bandStart, value: activeSetup.stopPrice },
-        { time: bandEnd, value: activeSetup.stopPrice },
-      ])
-      overlaySeriesRef.current.push(riskBand)
+        const riskBand = chart.addSeries(BaselineSeries, {
+          baseValue: { type: 'price', price: activeSetup.midpoint },
+          relativeGradient: true,
+          topFillColor1: 'rgba(239, 83, 80, .24)',
+          topFillColor2: 'rgba(239, 83, 80, .09)',
+          topLineColor: 'rgba(255, 92, 108, 0)',
+          bottomFillColor1: 'rgba(239, 83, 80, .09)',
+          bottomFillColor2: 'rgba(239, 83, 80, .24)',
+          bottomLineColor: 'rgba(255, 92, 108, 0)',
+          lineWidth: 1,
+          lastValueVisible: false,
+          priceLineVisible: false,
+        })
+        riskBand.setData([
+          { time: bandStart, value: activeSetup.stopPrice },
+          { time: bandEnd, value: activeSetup.stopPrice },
+        ])
+        overlaySeriesRef.current.push(riskBand)
+      }
 
       const levels = [
-        { price: activeSetup.midpoint, title: `${setupLabel} ENTRY`, color: '#dfbb74', style: LineStyle.Solid },
-        { price: activeSetup.stopPrice, title: `${setupLabel} STOP · −1R`, color: '#ff5c6c', style: LineStyle.Solid },
-        { price: activeSetup.targetPrice, title: `${setupLabel} TARGET · +4R`, color: '#39d98a', style: LineStyle.Solid },
+        {
+          price: activeSetup.midpoint,
+          title: `${setupLabel} ENTRY · ${showTradeLevels ? 'TRADE OPEN' : 'WAITING PULLBACK'}`,
+          color: '#dfbb74',
+          style: LineStyle.Solid,
+        },
+        ...(showTradeLevels ? [
+          { price: activeSetup.stopPrice, title: `${setupLabel} STOP · −1R`, color: '#ff5c6c', style: LineStyle.Solid },
+          { price: activeSetup.targetPrice, title: `${setupLabel} TARGET · +4R`, color: '#39d98a', style: LineStyle.Solid },
+        ] : []),
       ]
       const levelHost = chart.addSeries(LineSeries, {
         color: 'rgba(0, 0, 0, 0)',
@@ -309,9 +319,10 @@ export function CandleChart({
       })
     })
 
-    if (primarySetup && fittedSetupIdRef.current !== primarySetup.id) {
+    const fittedSetupKey = primarySetup ? `${primarySetup.id}:${primarySetup.status}` : null
+    if (primarySetup && fittedSetupIdRef.current !== fittedSetupKey) {
       chart.priceScale('right').applyOptions({ autoScale: true })
-      fittedSetupIdRef.current = primarySetup.id
+      fittedSetupIdRef.current = fittedSetupKey
     } else if (!primarySetup) {
       fittedSetupIdRef.current = null
     }
@@ -348,7 +359,7 @@ export function CandleChart({
       position: setup.direction === 'long' ? 'belowBar' as const : 'aboveBar' as const,
       shape: 'square' as const,
       color: alignedSetupIdSet.has(setup.id) ? '#39d98a' : '#dfbb74',
-      text: `${setupTimeLabel(setup.choch.time)} ${setup.direction.toUpperCase()} · ${setup.status === 'filled' ? 'ACTIVE' : setup.status.toUpperCase()}`,
+      text: `${setupTimeLabel(setup.choch.time)} ${setup.direction.toUpperCase()} · ${setup.status === 'filled' ? 'TRADE OPEN' : 'WAITING PULLBACK'}`,
     }))
     markerPluginRef.current?.setMarkers([...chochMarkers, ...setupMarkers].sort((a, b) => Number(a.time) - Number(b.time)))
   }, [analysis, tradeSetups, alignedSetupIds, showResolvedSetups])
@@ -361,12 +372,14 @@ export function CandleChart({
         {primarySetup && <div className="chart-level-readout">
           <span>FVG {primarySetup.bottom.toFixed(1)}–{primarySetup.top.toFixed(1)}</span>
           <span>ENTRY {primarySetup.midpoint.toFixed(1)}</span>
-          <span className="negative">SL {primarySetup.stopPrice.toFixed(1)}</span>
-          <span className="positive">TP {primarySetup.targetPrice.toFixed(1)}</span>
+          {(showResolvedSetups || primarySetup.status === 'filled') && <>
+            <span className="negative">SL {primarySetup.stopPrice.toFixed(1)}</span>
+            <span className="positive">TP {primarySetup.targetPrice.toFixed(1)}</span>
+          </>}
         </div>}
         {visibleSetups.length > 0 && !showResolvedSetups && (
-          <b className={`chart-setup-state ${primarySetup && alignedSetupIdSet.has(primarySetup.id) ? 'aligned' : ''}`}>
-            {visibleSetups.filter((setup) => setup.status === 'filled').length} active · {visibleSetups.filter((setup) => setup.status === 'open').length} waiting
+          <b className={`chart-setup-state ${primarySetup?.status === 'filled' ? 'trade-open' : ''} ${primarySetup && alignedSetupIdSet.has(primarySetup.id) ? 'aligned' : ''}`}>
+            {primarySetup?.status === 'filled' ? 'Trade open' : 'Waiting for pullback'}
           </b>
         )}
         {visibleSetups.length > 0 && showResolvedSetups && <b className="chart-setup-state aligned">Selected backtest trade</b>}

@@ -71,9 +71,9 @@ The notification board contains only waiting pullback predictions and active ent
 
 ## Chart display policy
 
-The single selected live setup retains its entry, stop, target, and risk/reward shading while waiting or active. Won, lost, and missed live levels are removed immediately. In backtesting, selecting a completed journal row restores that trade's entry, stop, target, and shading for review. Entry, stop, and target use viewport-wide price lines so they remain visible while navigating left or right. The reward area is translucent green from entry to target; the risk area is translucent red from entry to stop.
+The single selected live setup shows its FVG and midpoint entry while waiting for a pullback. Stop, target, and risk/reward shading remain hidden until a later candle fills the midpoint and the trade becomes open. At that point, entry/stop/target use viewport-wide price lines, the reward area is translucent green, and the risk area is translucent red. Won, lost, and missed live levels are removed immediately. In backtesting, selecting a completed journal row restores all trade levels and shading for review.
 
-When a setup first appears, the price scale automatically fits its FVG, entry, stop, and target. The chart toolbar repeats all four numeric levels and provides **Fit setup** to restore the complete risk/reward view after manual vertical navigation. The selected FVG uses stronger shading than contextual gaps.
+When a prediction first appears, the price scale fits its FVG and entry. Once entry fills, it refits to include stop and target. The toolbar explicitly says **Waiting for pullback** or **Trade open**, repeats only the currently applicable levels, and provides **Fit setup** after manual vertical navigation. The selected FVG uses stronger shading than contextual gaps.
 
 The setup receives a time-stamped candle tag. A short tag sits above its entry or CHoCH candle; a long tag sits below it.
 

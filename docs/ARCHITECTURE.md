@@ -54,7 +54,7 @@ The chart is built with TradingView Lightweight Charts. Its strategy annotations
 - a red `−1R` stop;
 - a green `+4R` target.
 
-The one-at-a-time one-minute setup receives viewport-wide price levels and remains visible until its prediction is missed/cancelled or its filled trade wins/loses. Gold identifies a setup against the current 15-minute bias; green identifies an aligned setup. Its time-stamped tag is placed above the setup candle for shorts and below it for longs. Resolved live overlays are removed automatically; the backtest chart can deliberately restore one selected completed trade. Translucent green and red bands visualize reward and risk respectively. The selected gap is shaded more strongly, all FVG/entry/SL/TP values are repeated in the toolbar, and **Fit setup** restores their automatic price range.
+The one-at-a-time one-minute setup remains visible until its prediction is missed/cancelled or its filled trade wins/loses. While waiting, the chart shows only the FVG, midpoint entry line, and **Waiting for pullback** state. After entry fills, it adds viewport-wide SL/TP levels, translucent risk/reward bands, and a **Trade open** state. Gold identifies a setup against the current 15-minute bias; green identifies an aligned setup. Its time-stamped tag is placed above the setup candle for shorts and below it for longs. Resolved live overlays are removed automatically; the backtest chart can deliberately restore one selected completed trade. **Fit setup** restores the applicable automatic price range.
 
 Live updates modify only new candle data. Strategy overlays are rebuilt only when a candle closes, not for every update to the current candle. Rolling the 300-candle window no longer resets the visible range, and trade overlays are excluded from automatic price scaling so a distant 4R target cannot compress the candle view into an apparently blank chart.
 
@@ -79,6 +79,7 @@ The prediction is announced after CHoCH and FVG confirmation, and only a later c
 
 - **Net profit:** Sum of `pnlUsd` for closed trades. Other currencies are display conversions only.
 - **Strategy win rate:** All version-7 filled wins divided by filled wins plus losses, independent of user decisions; missed and cancelled predictions are excluded.
+- **Automatic strategy summary:** One dashboard card combines that win-rate percentage with the same completed setup set's net R and simulated currency P/L (`risk_usd × r_result`).
 - **Overall win rate:** Accepted portfolio wins divided by wins plus losses; legacy cancellations and breakeven trades are excluded.
 - **Today's win rate:** The same calculation restricted to decisive trades closed today in the user's local timezone.
 - **R-multiple:** Profit or loss divided by planned initial risk. For example, risking USD 100 and earning USD 200 is `+2R`; losing the planned USD 100 is `-1R`.

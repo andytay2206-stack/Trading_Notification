@@ -72,6 +72,11 @@ export function Dashboard({ currency, onCurrencyChange, onOpenMarket }: Dashboar
   const strategyWins = strategyFinished.filter((item) => item.outcome === 'win').length
   const strategyLosses = strategyFinished.length - strategyWins
   const strategyWinRate = strategyFinished.length ? (strategyWins / strategyFinished.length) * 100 : 0
+  const strategyNetR = strategyFinished.reduce((total, item) => total + Number(item.r_result), 0)
+  const strategyPnlUsd = strategyFinished.reduce(
+    (total, item) => total + Number(item.risk_usd) * Number(item.r_result),
+    0,
+  )
 
   return (
     <main>
@@ -112,7 +117,15 @@ export function Dashboard({ currency, onCurrencyChange, onOpenMarket }: Dashboar
 
       <section className="metric-grid">
         <MetricCard eyebrow="Net profit" value={formatCurrency(performance.totalPnlUsd, currency)} detail={`${signedR(performance.totalR)} all time`} tone={performance.totalPnlUsd >= 0 ? 'positive' : 'negative'} featured />
-        <MetricCard eyebrow="Strategy win rate" value={`${strategyWinRate.toFixed(1)}%`} detail={`${strategyWins} wins · ${strategyLosses} losses · automatic`} />
+        <article className="metric-card strategy-performance-card">
+          <div className="metric-eyebrow">Automatic strategy</div>
+          <div className={`metric-value ${strategyPnlUsd >= 0 ? 'positive' : 'negative'}`}>{strategyWinRate.toFixed(1)}%</div>
+          <div className="strategy-performance-values">
+            <span><small>Net R</small><b className={strategyNetR >= 0 ? 'positive' : 'negative'}>{signedR(strategyNetR)}</b></span>
+            <span><small>Profit / loss</small><b className={strategyPnlUsd >= 0 ? 'positive' : 'negative'}>{formatCurrency(strategyPnlUsd, currency)}</b></span>
+          </div>
+          <div className="metric-detail">{strategyWins} wins · {strategyLosses} losses · automatic</div>
+        </article>
         <MetricCard eyebrow="Overall win rate" value={`${performance.overallWinRate.toFixed(1)}%`} detail={`${performance.wins} wins · ${performance.losses} losses · ${performance.cancellations} cancelled`} />
         <MetricCard eyebrow="Today's win rate" value={`${performance.todayWinRate.toFixed(1)}%`} detail={`${performance.todayTrades} closed today`} />
         <MetricCard eyebrow="Today's result" value={signedR(performance.todayR)} detail="Risk-adjusted return" tone={performance.todayR >= 0 ? 'positive' : 'negative'} />
