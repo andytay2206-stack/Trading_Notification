@@ -68,6 +68,8 @@ In production, an in-process Railway worker scans all application users sequenti
 
 The server scans 500 closed 15-minute candles and 1,000 closed 1-minute candles. Version-7 one-minute setups are processed chronologically through the same slot used by the chart and deduplicated in PostgreSQL. The dashboard separates waiting/active pullback predictions from finished history. After a filled setup reaches stop or target, the user may optionally record whether it was personally taken:
 
+Finished history displays the setup detection time, midpoint entry-fill time, and resolution time. Wins identify the exit as a TP hit, losses as an SL hit, while unfilled missed and cancelled predictions retain their appropriate non-trade labels. All timestamps render in the browser's local timezone.
+
 - **Check:** adds the result to `trades`, portfolio profit, R, and win rate, while retaining notification history.
 - **Cross:** retains the setup in notification history but excludes it from portfolio performance.
 

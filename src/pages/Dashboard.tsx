@@ -20,6 +20,9 @@ const CURRENT_STRATEGY_VERSION = 'structure-v7'
 const isPrediction = (notification: StrategyNotification) => notification.strategy_version === CURRENT_STRATEGY_VERSION
   && (notification.outcome === 'waiting' || notification.outcome === 'active')
 const isFinished = (notification: StrategyNotification) => ['win', 'loss', 'missed', 'cancelled'].includes(notification.outcome)
+const historyTime = (value: string | null) => value
+  ? new Date(value).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  : null
 
 export function Dashboard({ currency, onCurrencyChange, onOpenMarket }: DashboardProps) {
   const [trades, setTrades] = useState<Trade[]>([])
@@ -167,17 +170,28 @@ export function Dashboard({ currency, onCurrencyChange, onOpenMarket }: Dashboar
         {historyNotifications.length === 0
           ? <div className="notice-empty">Finished strategy setups will appear here automatically.</div>
           : <div className="trade-table">
-            <div className="trade-row signal-row trade-header"><span>Setup</span><span>Direction</span><span>Outcome</span><span>Status</span><span>Result</span></div>
+            <div className="trade-row signal-row trade-header"><span>Setup</span><span>Direction</span><span>Outcome</span><span>Entry</span><span>TP / SL</span><span>Status</span><span>Result</span></div>
             {historyNotifications.slice(0, 20).map((item) => {
               const status = item.outcome === 'cancelled' ? 'cancelled'
                 : item.outcome === 'missed' ? 'skipped'
                   : item.decision === 'accepted' ? 'accepted'
                     : item.decision === 'dismissed' ? 'skipped' : 'finished'
+              const exitLabel = item.outcome === 'win' ? 'TP hit'
+                : item.outcome === 'loss' ? 'SL hit'
+                  : item.outcome === 'missed' ? 'Target passed' : 'Cancelled'
+              const entryTime = historyTime(item.entry_time)
+              const exitTime = historyTime(item.exit_time)
               return (
                 <div className="trade-row signal-row" key={item.id}>
                   <span><b>BTCUSDT</b><small>{new Date(item.detected_at).toLocaleString()}</small></span>
                   <span className={item.direction}>{item.direction}</span>
                   <span>{item.outcome}</span>
+                  <span>{entryTime
+                    ? <><b>{entryTime}</b><small>Midpoint filled</small></>
+                    : <span className="muted">Not entered</span>}</span>
+                  <span>{exitTime
+                    ? <><b>{exitTime}</b><small>{exitLabel}</small></>
+                    : <span className="muted">—</span>}</span>
                   <span className={status === 'accepted' ? 'positive' : status === 'cancelled' ? 'warning' : 'muted'}>
                     {status}
                     {!item.decision && needsDecision(item) && <span className="history-decision-actions">
