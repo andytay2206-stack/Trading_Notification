@@ -1,5 +1,5 @@
 import type { Candle, CandleInterval } from '../types'
-import { alignedOneMinuteSetups, analyzeStructure } from './structureStrategy'
+import { alignedOneMinuteSetups, analyzeStructure, oneSetupAtATime } from './structureStrategy'
 
 export interface BacktestConfig {
   interval: CandleInterval
@@ -19,8 +19,8 @@ export interface BacktestTrade {
   exitPrice: number
   rMultiple: number
   pnlUsd: number
-  outcome: 'win' | 'loss'
-  exitReason: 'target' | 'stop'
+  outcome: 'win' | 'loss' | 'cancelled'
+  exitReason: 'target' | 'stop' | 'cancelled'
 }
 
 export interface BacktestResult {
@@ -30,6 +30,7 @@ export interface BacktestResult {
   winRate: number
   wins: number
   losses: number
+  cancellations: number
   maxDrawdownR: number
 }
 
@@ -38,27 +39,29 @@ export function runStructureBacktest(oneMinuteCandles: Candle[], fifteenMinuteCa
     pivotLength: config.pivotLength,
     stopBufferPercent: config.stopBufferPercent,
     rewardRisk: config.rewardRisk,
-    maxEntryWaitCandles: 120,
+    maxSetupCandles: 180,
   }
   const oneMinute = analyzeStructure(oneMinuteCandles, settings)
   const fifteenMinute = analyzeStructure(fifteenMinuteCandles, settings)
-  const setups = alignedOneMinuteSetups(oneMinute, fifteenMinute)
+  const setups = oneSetupAtATime(alignedOneMinuteSetups(oneMinute, fifteenMinute))
   const trades: BacktestTrade[] = setups
-    .filter((setup) => setup.entryTime && setup.exitTime && (setup.status === 'won' || setup.status === 'lost'))
+    .filter((setup) => setup.entryTime && setup.exitTime
+      && (setup.status === 'won' || setup.status === 'lost' || setup.status === 'cancelled'))
     .map((setup) => {
       const won = setup.status === 'won'
-      const rMultiple = won ? config.rewardRisk : -1
+      const lost = setup.status === 'lost'
+      const rMultiple = setup.rResult ?? (won ? config.rewardRisk : lost ? -1 : 0)
       return {
         id: setup.id,
         side: setup.direction,
         entryTime: setup.entryTime!,
         exitTime: setup.exitTime!,
         entryPrice: setup.midpoint,
-        exitPrice: won ? setup.targetPrice : setup.stopPrice,
+        exitPrice: setup.exitPrice ?? (won ? setup.targetPrice : setup.stopPrice),
         rMultiple,
         pnlUsd: rMultiple * config.riskUsd,
-        outcome: won ? 'win' as const : 'loss' as const,
-        exitReason: won ? 'target' as const : 'stop' as const,
+        outcome: won ? 'win' as const : lost ? 'loss' as const : 'cancelled' as const,
+        exitReason: won ? 'target' as const : lost ? 'stop' as const : 'cancelled' as const,
       }
     })
 
@@ -72,14 +75,16 @@ export function runStructureBacktest(oneMinuteCandles: Candle[], fifteenMinuteCa
     maxDrawdownR = Math.max(maxDrawdownR, peakR - equityR)
   })
   const wins = trades.filter((trade) => trade.outcome === 'win').length
-  const losses = trades.length - wins
+  const losses = trades.filter((trade) => trade.outcome === 'loss').length
+  const cancellations = trades.filter((trade) => trade.outcome === 'cancelled').length
   return {
     trades,
     netR,
     netProfitUsd: netR * config.riskUsd,
-    winRate: trades.length ? (wins / trades.length) * 100 : 0,
+    winRate: wins + losses ? (wins / (wins + losses)) * 100 : 0,
     wins,
     losses,
+    cancellations,
     maxDrawdownR,
   }
 }

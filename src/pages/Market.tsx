@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CandleChart } from '../components/CandleChart'
 import { fetchCandles, subscribeToCandles } from '../services/bybit'
-import { alignedOneMinuteSetups, analyzeStructure } from '../lib/structureStrategy'
+import { getStrategyState } from '../services/api'
+import { alignedOneMinuteSetups, analyzeStructure, oneSetupAtATime } from '../lib/structureStrategy'
 import type { Candle, CandleInterval } from '../types'
 
 const intervals: Array<{ value: CandleInterval; label: string }> = [
@@ -37,6 +38,7 @@ export function Market() {
   const [reloadKey, setReloadKey] = useState(0)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [fifteenMinuteCandles, setFifteenMinuteCandles] = useState<Candle[]>([])
+  const [strategyStartedAt, setStrategyStartedAt] = useState<number | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -100,6 +102,12 @@ export function Market() {
     }
   }, [])
 
+  useEffect(() => {
+    void getStrategyState()
+      .then(({ startedAt }) => setStrategyStartedAt(new Date(startedAt).getTime() / 1000))
+      .catch(() => setStrategyStartedAt(null))
+  }, [])
+
   const latest = candles.at(-1)
   const previous = candles.at(-2)
   const change = useMemo(() => latest && previous ? ((latest.close - previous.close) / previous.close) * 100 : 0, [latest, previous])
@@ -109,10 +117,16 @@ export function Market() {
     .join('|')
   const analysis = useMemo(() => analyzeStructure(confirmedCandles), [confirmedSignature])
   const fifteenMinuteAnalysis = useMemo(() => analyzeStructure(fifteenMinuteCandles.filter((candle) => candle.confirmed)), [fifteenMinuteCandles])
-  const alignedSetups = useMemo(() => interval === '1' ? alignedOneMinuteSetups(analysis, fifteenMinuteAnalysis) : [], [analysis, fifteenMinuteAnalysis, interval])
+  const alignedSetups = useMemo(
+    () => interval === '1' && strategyStartedAt !== null
+      ? oneSetupAtATime(alignedOneMinuteSetups(analysis, fifteenMinuteAnalysis)
+        .filter((setup) => setup.choch.time >= strategyStartedAt))
+      : [],
+    [analysis, fifteenMinuteAnalysis, interval, strategyStartedAt],
+  )
   const chartSetups = useMemo(
-    () => interval === '1' ? analysis.fairValueGaps.filter((setup) => setup.status === 'open' || setup.status === 'filled') : [],
-    [analysis, interval],
+    () => alignedSetups.filter((setup) => setup.status === 'open' || setup.status === 'filled'),
+    [alignedSetups],
   )
   const alignedSetupIds = useMemo(() => alignedSetups.map((setup) => setup.id), [alignedSetups])
 

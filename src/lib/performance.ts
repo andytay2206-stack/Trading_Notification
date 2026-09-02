@@ -10,6 +10,7 @@ export interface PerformanceSummary {
   todayTrades: number
   wins: number
   losses: number
+  cancellations: number
 }
 
 const isSameLocalDay = (isoDate: string, now: Date) => {
@@ -20,8 +21,9 @@ const isSameLocalDay = (isoDate: string, now: Date) => {
 }
 
 const winRate = (trades: Trade[]) => {
-  if (trades.length === 0) return 0
-  return (trades.filter((trade) => trade.outcome === 'win').length / trades.length) * 100
+  const decisive = trades.filter((trade) => trade.outcome === 'win' || trade.outcome === 'loss')
+  if (decisive.length === 0) return 0
+  return (decisive.filter((trade) => trade.outcome === 'win').length / decisive.length) * 100
 }
 
 export function summarizePerformance(trades: Trade[], now = new Date()): PerformanceSummary {
@@ -38,5 +40,6 @@ export function summarizePerformance(trades: Trade[], now = new Date()): Perform
     todayTrades: today.length,
     wins: closed.filter((trade) => trade.outcome === 'win').length,
     losses: closed.filter((trade) => trade.outcome === 'loss').length,
+    cancellations: closed.filter((trade) => trade.outcome === 'cancelled').length,
   }
 }

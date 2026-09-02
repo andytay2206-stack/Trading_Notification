@@ -18,7 +18,7 @@ Northstar is a notification-first futures monitor. A React interface talks to a 
 - Random historical-window backtesting with win rate, profit, net R, and drawdown results
 - Login-protected workspace with an HTTP-only session cookie and sidebar logout
 - PostgreSQL storage for users, trades, performance snapshots, and completed backtests
-- Automated strategy indicators on a navigable TradingView Lightweight Charts view, retaining every waiting or active 1R/4R setup until it resolves
+- Automated strategy indicators on a navigable TradingView Lightweight Charts view, with one setup slot and a 180-candle maximum lifecycle
 - Timestamp-aligned 15-minute bias and 1-minute setup scanning
 - Persistent notification board with portfolio acceptance and history-only dismissal
 
@@ -43,6 +43,12 @@ npm run dev
 ```
 
 `db:setup` detects the newest PostgreSQL installation and securely prompts for the `postgres` administrator password chosen during installation. It creates the `northstar` role and database expected by `.env`; the password is not saved or printed. The API creates its application tables on first startup.
+
+To clear trading history and begin strategy tracking from the current time while preserving users and schema:
+
+```powershell
+npm run db:reset-data
+```
 
 Open the local address printed by Vite (normally `http://localhost:5173`).
 

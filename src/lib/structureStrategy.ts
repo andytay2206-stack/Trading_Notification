@@ -27,9 +27,11 @@ export interface FairValueGap {
   choch: ChochEvent
   stopPrice: number
   targetPrice: number
-  status: 'open' | 'filled' | 'won' | 'lost' | 'expired'
+  status: 'open' | 'filled' | 'won' | 'lost' | 'cancelled'
   entryTime?: number
   exitTime?: number
+  exitPrice?: number
+  rResult?: number
 }
 
 export interface StructureAnalysis {
@@ -44,14 +46,14 @@ export interface StrategySettings {
   pivotLength: number
   stopBufferPercent: number
   rewardRisk: number
-  maxEntryWaitCandles: number
+  maxSetupCandles: number
 }
 
 export const defaultStructureSettings: StrategySettings = {
   pivotLength: 2,
   stopBufferPercent: 5,
   rewardRisk: 4,
-  maxEntryWaitCandles: 120,
+  maxSetupCandles: 180,
 }
 
 export function findSwingPoints(candles: Candle[], pivotLength = 2): SwingPoint[] {
@@ -166,12 +168,14 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
       status: 'open',
     }
 
-    const entryDeadline = choch.index + 2 + settings.maxEntryWaitCandles
+    const cancellationIndex = choch.index + settings.maxSetupCandles
     for (let index = choch.index + 2; index < candles.length; index += 1) {
       const candle = candles[index]
       if (!gap.entryTime) {
-        if (index >= entryDeadline) {
-          gap.status = 'expired'
+        if (index >= cancellationIndex) {
+          gap.status = 'cancelled'
+          gap.exitTime = candle.time
+          gap.rResult = 0
           break
         }
         if (candle.low <= midpoint && candle.high >= midpoint) {
@@ -185,11 +189,24 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
       if (stopped) {
         gap.status = 'lost'
         gap.exitTime = candle.time
+        gap.exitPrice = stopPrice
+        gap.rResult = -1
         break
       }
       if (targeted) {
         gap.status = 'won'
         gap.exitTime = candle.time
+        gap.exitPrice = targetPrice
+        gap.rResult = settings.rewardRisk
+        break
+      }
+      if (index >= cancellationIndex) {
+        gap.status = 'cancelled'
+        gap.exitTime = candle.time
+        gap.exitPrice = candle.close
+        gap.rResult = choch.direction === 'long'
+          ? (candle.close - midpoint) / risk
+          : (midpoint - candle.close) / risk
         break
       }
     }
@@ -206,4 +223,17 @@ export function alignedOneMinuteSetups(oneMinute: StructureAnalysis, fifteenMinu
       .at(-1)?.direction
     return knownBias === gap.direction
   })
+}
+
+export function oneSetupAtATime(setups: FairValueGap[]) {
+  const selected: FairValueGap[] = []
+  let unavailableUntil = Number.NEGATIVE_INFINITY
+
+  for (const setup of [...setups].sort((a, b) => a.choch.time - b.choch.time)) {
+    if (setup.choch.time <= unavailableUntil) continue
+    selected.push(setup)
+    unavailableUntil = setup.exitTime ?? Number.POSITIVE_INFINITY
+  }
+
+  return selected
 }

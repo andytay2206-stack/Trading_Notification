@@ -6,7 +6,7 @@ import { createSession, requireAuth, SESSION_COOKIE } from './auth.js'
 import { describeBybitError, restClient, subscribeToKline } from './bybit.js'
 import { config } from './config.js'
 import { closeDatabase, initializeDatabase, pool } from './db.js'
-import { decideNotification, scanStrategy } from './strategy.js'
+import { decideNotification, getStrategyRuntime, scanStrategy } from './strategy.js'
 
 const app = express()
 const allowedIntervals = new Set(['1', '3', '5', '15', '30', '60', '120', '240', '360', '720', 'D', 'W', 'M'])
@@ -120,12 +120,16 @@ app.post('/api/strategy/scan', async (request, response) => {
   }
 })
 
+app.get('/api/strategy/state', async (request, response) => {
+  response.json(await getStrategyRuntime(request.user!.id))
+})
+
 app.get('/api/strategy/notifications', async (request, response) => {
   const result = await pool.query(
     `SELECT id, signal_key, direction, higher_timeframe_bias, detected_at, entry_time, exit_time,
-       entry_price, stop_price, target_price, risk_usd, outcome, r_result, decision, decided_at
+       entry_price, stop_price, target_price, exit_price, risk_usd, outcome, r_result, decision, decided_at
      FROM trade_notifications
-     WHERE user_id = $1 AND (strategy_version = 'structure-v4' OR decision IS NOT NULL)
+     WHERE user_id = $1 AND (strategy_version = 'structure-v5' OR decision IS NOT NULL)
      ORDER BY detected_at DESC LIMIT 100`,
     [request.user!.id],
   )
@@ -168,12 +172,12 @@ app.post('/api/backtests', async (request, response) => {
   const result = await pool.query(
     `INSERT INTO backtest_runs
       (user_id, strategy_name, interval, candle_count, window_start, window_end, risk_usd, reward_risk,
-       net_profit_usd, net_r, win_rate, wins, losses, total_trades, max_drawdown_r, config)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+       net_profit_usd, net_r, win_rate, wins, losses, cancellations, total_trades, max_drawdown_r, config)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
      RETURNING id, created_at`,
     [request.user!.id, '15m CHoCH / 1m FVG', body.interval, body.candleCount, body.windowStart, body.windowEnd,
       body.riskUsd, body.rewardRisk, body.netProfitUsd, body.netR, body.winRate, body.wins, body.losses,
-      body.totalTrades, body.maxDrawdownR, JSON.stringify(body.config ?? {})],
+      body.cancellations, body.totalTrades, body.maxDrawdownR, JSON.stringify(body.config ?? {})],
   )
   response.status(201).json({ run: result.rows[0] })
 })

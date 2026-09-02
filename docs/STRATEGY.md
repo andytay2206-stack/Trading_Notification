@@ -36,8 +36,8 @@ The CHoCH candle must also be the middle displacement candle of a three-candle p
 - Bullish FVG: the following candle's low is above the preceding candle's high.
 - Bearish FVG: the following candle's high is below the preceding candle's low.
 - Entry is the 50% midpoint between the two FVG boundaries.
-- Entry remains eligible for 120 one-minute candles.
-- Once filled, the trade continues to be evaluated against its stop and target for every later available candle; the 120-candle limit applies only while waiting for entry.
+- A selected setup has a total lifetime of 180 one-minute candles from its CHoCH candle.
+- No newer setup is considered while the selected setup is waiting, filled, or active.
 
 In the documented live example, 01:27 is the middle CHoCH/displacement candle; 01:26 and 01:28 provide the two non-overlapping wick boundaries.
 
@@ -50,26 +50,31 @@ This is the current precise interpretation of the requested gap inside the CHoCH
 - `1R` is the distance from FVG midpoint entry to that stop.
 - Target is exactly `4R` from entry.
 - If one candle contains both stop and target, the engine records the stop first (`−1R`) because candle data cannot reveal intrabar ordering.
+- If an unfilled setup reaches 180 candles, it is cancelled automatically at `0R`.
+- If a filled trade reaches 180 candles without stop or target, it is cancelled at that candle's close. Its fractional R is the directional entry-to-close move divided by initial risk, and USD P/L is fractional R multiplied by configured risk USD.
 - The USD value of `1R` defaults to `STRATEGY_RISK_USD=100` in `.env`.
 
 ## Direction filter
 
 A 1-minute FVG setup is valid only when its direction matches the timestamp-aligned 15-minute structural bias. Neutral 15-minute structure produces no entry.
 
+Aligned setups are processed chronologically through one trade slot. A later signal is ignored until the selected setup wins, loses, or is cancelled. After a database reset, live scanning and charting ignore all setups detected before the persisted reset timestamp.
+
 ## Portfolio decision
 
-The scanner tracks every valid setup virtually. When it resolves:
+The scanner tracks the selected setup virtually. When it resolves:
 
 - Check means the user took the trade; the result enters portfolio statistics and history.
 - Cross means the user did not take the trade; it remains in signal history but does not affect portfolio statistics.
+- A filled cancellation also receives Check/Cross and carries its actual partial R and P/L. An unfilled cancellation is recorded automatically at `0R` without a portfolio decision.
 
 ## Chart display policy
 
-Every setup whose FVG is waiting for entry or whose virtual trade is active retains its entry, stop, target, and risk/reward shading until it resolves. Won, lost, and expired trade levels are removed immediately. Entry, stop, and target use viewport-wide price lines so they remain visible while navigating left or right. The reward area is translucent green from entry to target; the risk area is translucent red from entry to stop.
+The single selected setup retains its entry, stop, target, and risk/reward shading while waiting or active. Won, lost, and cancelled trade levels are removed immediately. Entry, stop, and target use viewport-wide price lines so they remain visible while navigating left or right. The reward area is translucent green from entry to target; the risk area is translucent red from entry to stop.
 
-Each unresolved setup receives a time-stamped candle tag. Short tags sit above their entry or CHoCH candle, while long tags sit below it so separate trades remain identifiable without occupying the same candle area. Green tags are aligned with the timestamp-specific 15-minute direction; gold tags are visual candidates that are not notification-eligible.
+The setup receives a time-stamped candle tag. A short tag sits above its entry or CHoCH candle; a long tag sits below it.
 
-CHoCH is drawn as an orange dashed break line and marker. Three recent softly shaded, direction-colored FVG zones remain visible for context, along with every unresolved setup even if its originating CHoCH has moved outside the one-hour window. Compact labeled trend lines connect the latest swing highs and swing lows. Colors and annotation hierarchy follow TradingView's dark-chart conventions.
+CHoCH is drawn as an orange dashed break line and marker. Three recent softly shaded, direction-colored FVG zones remain visible for context, along with the selected setup if its originating CHoCH has moved outside the one-hour window. Compact labeled trend lines connect the latest swing highs and swing lows. Colors and annotation hierarchy follow TradingView's dark-chart conventions.
 
 The automated indicators do not prevent chart navigation. Use the mouse wheel to zoom, drag the chart to move through candle history, drag the time or price axis to rescale, and double-click an axis to reset it. Navigating away pauses automatic real-time following; **Latest candles** returns to the live edge.
 

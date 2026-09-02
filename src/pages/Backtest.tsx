@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { CandleChart } from '../components/CandleChart'
 import { formatCurrency } from '../lib/currency'
 import { randomHistoricalEnd, runStructureBacktest, type BacktestConfig, type BacktestResult } from '../lib/backtest'
-import { alignedOneMinuteSetups, analyzeStructure } from '../lib/structureStrategy'
+import { alignedOneMinuteSetups, analyzeStructure, oneSetupAtATime } from '../lib/structureStrategy'
 import { fetchCandles } from '../services/bybit'
 import { saveBacktestRun } from '../services/api'
 import type { Candle } from '../types'
@@ -49,7 +49,7 @@ export function Backtest() {
   const last = candles.at(-1)
   const chartAnalysis = useMemo(() => analyzeStructure(candles), [candles])
   const biasAnalysis = useMemo(() => analyzeStructure(fifteenMinuteCandles), [fifteenMinuteCandles])
-  const chartSetups = useMemo(() => alignedOneMinuteSetups(chartAnalysis, biasAnalysis), [chartAnalysis, biasAnalysis])
+  const chartSetups = useMemo(() => oneSetupAtATime(alignedOneMinuteSetups(chartAnalysis, biasAnalysis)), [chartAnalysis, biasAnalysis])
   const latestChartSetup = useMemo(() => chartSetups.filter((setup) => setup.status === 'open' || setup.status === 'filled').slice(-1), [chartSetups])
 
   return (
@@ -101,7 +101,7 @@ export function Backtest() {
             <>
               <section className="backtest-metrics">
                 <article className="panel"><span>Net profit</span><strong className={result.netProfitUsd >= 0 ? 'positive' : 'negative'}>{formatCurrency(result.netProfitUsd, 'USD')}</strong><small>{result.netR >= 0 ? '+' : ''}{result.netR.toFixed(2)}R</small></article>
-                <article className="panel"><span>Win rate</span><strong>{result.winRate.toFixed(1)}%</strong><small>{result.wins}W · {result.losses}L</small></article>
+                <article className="panel"><span>Win rate</span><strong>{result.winRate.toFixed(1)}%</strong><small>{result.wins}W · {result.losses}L · {result.cancellations}C</small></article>
                 <article className="panel"><span>Total trades</span><strong>{result.trades.length}</strong><small>{config.candleCount} candles</small></article>
                 <article className="panel"><span>Max drawdown</span><strong className="negative">−{result.maxDrawdownR.toFixed(2)}R</strong><small>Peak to trough</small></article>
               </section>

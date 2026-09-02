@@ -1,10 +1,28 @@
-import { alignedOneMinuteSetups, analyzeStructure } from '../src/lib/structureStrategy.js'
+import { alignedOneMinuteSetups, analyzeStructure, oneSetupAtATime } from '../src/lib/structureStrategy.js'
 import type { Candle } from '../src/types.js'
 import { restClient } from './bybit.js'
 import { config } from './config.js'
 import { pool } from './db.js'
+import type { FairValueGap } from '../src/lib/structureStrategy.js'
 
-const STRATEGY_VERSION = 'structure-v4'
+const STRATEGY_VERSION = 'structure-v5'
+
+export async function getStrategyRuntime(userId: string) {
+  const result = await pool.query<{ started_at: Date }>(
+    `INSERT INTO strategy_runtime (user_id, strategy_version)
+     VALUES ($1, $2)
+     ON CONFLICT (user_id) DO UPDATE SET
+       strategy_version = EXCLUDED.strategy_version,
+       started_at = CASE
+         WHEN strategy_runtime.strategy_version <> EXCLUDED.strategy_version THEN NOW()
+         ELSE strategy_runtime.started_at
+       END,
+       updated_at = NOW()
+     RETURNING started_at`,
+    [userId, STRATEGY_VERSION],
+  )
+  return { startedAt: result.rows[0].started_at }
+}
 
 async function loadCandles(interval: '1' | '15', limit: number): Promise<Candle[]> {
   const response = await restClient.getKline({ category: 'linear', symbol: 'BTCUSDT', interval, limit })
@@ -21,11 +39,11 @@ async function loadCandles(interval: '1' | '15', limit: number): Promise<Candle[
   })).reverse()
 }
 
-const outcomeFor = (status: string) => {
-  if (status === 'won') return { outcome: 'win', rResult: 4 }
-  if (status === 'lost') return { outcome: 'loss', rResult: -1 }
-  if (status === 'filled') return { outcome: 'active', rResult: 0 }
-  if (status === 'expired') return { outcome: 'expired', rResult: 0 }
+const outcomeFor = (setup: FairValueGap) => {
+  if (setup.status === 'won') return { outcome: 'win', rResult: setup.rResult ?? 4 }
+  if (setup.status === 'lost') return { outcome: 'loss', rResult: setup.rResult ?? -1 }
+  if (setup.status === 'cancelled') return { outcome: 'cancelled', rResult: setup.rResult ?? 0 }
+  if (setup.status === 'filled') return { outcome: 'active', rResult: 0 }
   return { outcome: 'waiting', rResult: 0 }
 }
 
@@ -36,32 +54,37 @@ export async function scanStrategy(userId: string) {
   ])
   const oneMinute = analyzeStructure(oneMinuteCandles.filter((candle) => candle.confirmed))
   const fifteenMinute = analyzeStructure(fifteenMinuteCandles.filter((candle) => candle.confirmed))
-  const setups = alignedOneMinuteSetups(oneMinute, fifteenMinute)
+  const runtime = await getStrategyRuntime(userId)
+  const startedAtSeconds = runtime.startedAt.getTime() / 1000
+  const eligible = alignedOneMinuteSetups(oneMinute, fifteenMinute)
+    .filter((setup) => setup.choch.time >= startedAtSeconds)
+  const setups = oneSetupAtATime(eligible)
 
   for (const setup of setups) {
-    const result = outcomeFor(setup.status)
+    const result = outcomeFor(setup)
     await pool.query(
       `INSERT INTO trade_notifications
         (user_id, signal_key, strategy_version, direction, higher_timeframe_bias, detected_at, entry_time, exit_time,
-         entry_price, stop_price, target_price, risk_usd, outcome, r_result)
+         entry_price, stop_price, target_price, exit_price, risk_usd, outcome, r_result)
        VALUES ($1, $2, $3, $4, $5, TO_TIMESTAMP($6), TO_TIMESTAMP($7), TO_TIMESTAMP($8),
-         $9, $10, $11, $12, $13, $14)
+         $9, $10, $11, $12, $13, $14, $15)
        ON CONFLICT (user_id, signal_key) DO UPDATE SET
          entry_time = EXCLUDED.entry_time,
          exit_time = EXCLUDED.exit_time,
          entry_price = EXCLUDED.entry_price,
          stop_price = EXCLUDED.stop_price,
          target_price = EXCLUDED.target_price,
+         exit_price = EXCLUDED.exit_price,
          outcome = EXCLUDED.outcome,
          r_result = EXCLUDED.r_result,
          updated_at = NOW()`,
       [userId, `${STRATEGY_VERSION}:${setup.id}`, STRATEGY_VERSION, setup.direction, fifteenMinute.bias, setup.choch.time,
         setup.entryTime ?? null, setup.exitTime ?? null, setup.midpoint, setup.stopPrice,
-        setup.targetPrice, config.strategyRiskUsd, result.outcome, result.rResult],
+        setup.targetPrice, setup.exitPrice ?? null, config.strategyRiskUsd, result.outcome, result.rResult],
     )
   }
 
-  return { scanned: setups.length, bias: fifteenMinute.bias }
+  return { scanned: setups.length, bias: fifteenMinute.bias, startedAt: runtime.startedAt }
 }
 
 export async function decideNotification(userId: string, notificationId: string, decision: 'accepted' | 'dismissed') {
@@ -71,10 +94,11 @@ export async function decideNotification(userId: string, notificationId: string,
     const result = await client.query<{
       id: string
       direction: 'long' | 'short'
-      outcome: 'win' | 'loss' | 'active' | 'waiting' | 'expired'
+      outcome: 'win' | 'loss' | 'active' | 'waiting' | 'cancelled'
       entry_price: string
       stop_price: string
       target_price: string
+      exit_price: string | null
       risk_usd: string
       r_result: string
       detected_at: Date
@@ -82,7 +106,8 @@ export async function decideNotification(userId: string, notificationId: string,
       exit_time: Date | null
     }>(
       `UPDATE trade_notifications SET decision = $3, decided_at = NOW(), updated_at = NOW()
-       WHERE id = $1 AND user_id = $2 AND decision IS NULL AND outcome IN ('win', 'loss')
+       WHERE id = $1 AND user_id = $2 AND decision IS NULL
+         AND (outcome IN ('win', 'loss') OR (outcome = 'cancelled' AND entry_time IS NOT NULL))
        RETURNING *`,
       [notificationId, userId, decision],
     )
@@ -100,7 +125,8 @@ export async function decideNotification(userId: string, notificationId: string,
          VALUES ($1, 'BTCUSDT', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          ON CONFLICT DO NOTHING`,
         [userId, notification.direction, notification.outcome, entry,
-          notification.outcome === 'win' ? Number(notification.target_price) : Number(notification.stop_price),
+          notification.outcome === 'win' ? Number(notification.target_price)
+            : notification.outcome === 'loss' ? Number(notification.stop_price) : Number(notification.exit_price),
           riskUsd, riskUsd * rResult, rResult, notification.entry_time ?? notification.detected_at,
           notification.exit_time ?? new Date(), notification.id],
       )

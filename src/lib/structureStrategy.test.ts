@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Candle } from '../types'
-import { alignedOneMinuteSetups, analyzeStructure, findSwingPoints } from './structureStrategy'
+import { alignedOneMinuteSetups, analyzeStructure, findSwingPoints, oneSetupAtATime } from './structureStrategy'
 
 const candle = (index: number, open: number, high: number, low: number, close: number): Candle => ({
   time: 1_700_000_000 + index * 60,
@@ -11,6 +11,23 @@ const candle = (index: number, open: number, high: number, low: number, close: n
   volume: 1,
   confirmed: true,
 })
+
+const bullishSequence = [
+  candle(0, 10, 10.5, 9.5, 10),
+  candle(1, 10, 12, 9.8, 11),
+  candle(2, 11, 11.4, 9.2, 10),
+  candle(3, 10, 10.5, 8, 8.5),
+  candle(4, 8.5, 10, 8.4, 9.5),
+  candle(5, 9.5, 11, 8.8, 10.5),
+  candle(6, 10.5, 10.7, 9.4, 10),
+  candle(7, 10, 10.2, 8.7, 9),
+  candle(8, 9, 9.2, 7.6, 8),
+  candle(9, 8, 13, 7.8, 12.5),
+  candle(10, 12.5, 13.2, 9.5, 12.8),
+  candle(11, 12.8, 13, 9.2, 10),
+  candle(12, 10, 16.8, 9.8, 16.5),
+  candle(13, 16, 16.1, 15, 15.5),
+]
 
 describe('market structure strategy', () => {
   it('finds confirmed swing highs and lows', () => {
@@ -41,23 +58,7 @@ describe('market structure strategy', () => {
   })
 
   it('keeps tracking a filled trade after its entry-wait window until the 4R target', () => {
-    const data = [
-      candle(0, 10, 10.5, 9.5, 10),
-      candle(1, 10, 12, 9.8, 11),
-      candle(2, 11, 11.4, 9.2, 10),
-      candle(3, 10, 10.5, 8, 8.5),
-      candle(4, 8.5, 10, 8.4, 9.5),
-      candle(5, 9.5, 11, 8.8, 10.5),
-      candle(6, 10.5, 10.7, 9.4, 10),
-      candle(7, 10, 10.2, 8.7, 9),
-      candle(8, 9, 9.2, 7.6, 8),
-      candle(9, 8, 13, 7.8, 12.5),
-      candle(10, 12.5, 13.2, 9.5, 12.8),
-      candle(11, 12.8, 13, 9.2, 10),
-      candle(12, 10, 16.8, 9.8, 16.5),
-      candle(13, 16, 16.1, 15, 15.5),
-    ]
-    const analysis = analyzeStructure(data, { pivotLength: 1, stopBufferPercent: 5, rewardRisk: 4, maxEntryWaitCandles: 1 })
+    const analysis = analyzeStructure(bullishSequence, { pivotLength: 1, stopBufferPercent: 5, rewardRisk: 4, maxSetupCandles: 4 })
     const bullish = analysis.fairValueGaps.find((gap) => gap.direction === 'long')
 
     expect(bullish).toBeDefined()
@@ -65,6 +66,27 @@ describe('market structure strategy', () => {
     expect(bullish?.stopPrice).toBeCloseTo(7.52)
     expect(bullish?.targetPrice).toBeCloseTo(16.67)
     expect(bullish?.status).toBe('won')
+  })
+
+  it('cancels a filled trade at its lifetime close and records partial R', () => {
+    const data = [...bullishSequence]
+    data[12] = candle(12, 10, 10.5, 9.8, 10)
+    const analysis = analyzeStructure(data, { pivotLength: 1, stopBufferPercent: 5, rewardRisk: 4, maxSetupCandles: 3 })
+    const setup = analysis.fairValueGaps.find((gap) => gap.direction === 'long')
+
+    expect(setup?.status).toBe('cancelled')
+    expect(setup?.exitTime).toBe(data[12].time)
+    expect(setup?.exitPrice).toBe(10)
+    expect(setup?.rResult).toBeCloseTo((10 - 9.35) / (9.35 - 7.52))
+  })
+
+  it('ignores later setups until the selected setup has finished', () => {
+    const setup = (time: number, exitTime?: number) => ({ choch: { time }, exitTime })
+    const selected = oneSetupAtATime([
+      setup(10, 20), setup(15, 16), setup(21), setup(22, 25),
+    ] as never)
+
+    expect(selected.map((item) => item.choch.time)).toEqual([10, 21])
   })
 
   it('matches the 01:17 low, 01:25 high, and 01:27 bearish CHoCH example', () => {

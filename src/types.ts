@@ -1,5 +1,5 @@
 export type Currency = 'USD' | 'IDR' | 'MYR'
-export type TradeOutcome = 'win' | 'loss' | 'breakeven' | 'open'
+export type TradeOutcome = 'win' | 'loss' | 'breakeven' | 'cancelled' | 'open'
 export type TradeSide = 'long' | 'short'
 
 export interface Trade {

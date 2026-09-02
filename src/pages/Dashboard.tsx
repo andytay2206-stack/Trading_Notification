@@ -13,6 +13,9 @@ interface DashboardProps {
 }
 
 const signedR = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(1)}R`
+const needsDecision = (notification: StrategyNotification) => notification.outcome === 'win'
+  || notification.outcome === 'loss'
+  || (notification.outcome === 'cancelled' && notification.entry_time !== null)
 
 export function Dashboard({ currency, onCurrencyChange, onOpenMarket }: DashboardProps) {
   const [trades, setTrades] = useState<Trade[]>([])
@@ -55,6 +58,8 @@ export function Dashboard({ currency, onCurrencyChange, onOpenMarket }: Dashboar
 
   const performance = summarizePerformance(trades)
   const recentTrades = [...trades].sort((a, b) => (b.closedAt ?? b.openedAt).localeCompare(a.closedAt ?? a.openedAt)).slice(0, 5)
+  const historyNotifications = notifications.filter((item) => item.decision
+    || (item.outcome === 'cancelled' && item.entry_time === null))
 
   return (
     <main>
@@ -74,22 +79,22 @@ export function Dashboard({ currency, onCurrencyChange, onOpenMarket }: Dashboar
         </div>
         {signalError && <div className="notice-error">{signalError}</div>}
         {loadingSignals && <div className="notice-empty">Scanning 15m direction and 1m structure…</div>}
-        {!loadingSignals && notifications.filter((item) => !item.decision && (item.outcome === 'win' || item.outcome === 'loss')).length === 0 && (
+        {!loadingSignals && notifications.filter((item) => !item.decision && needsDecision(item)).length === 0 && (
           <div className="notice-empty">No completed strategy setup is waiting for your decision.</div>
         )}
         <div className="notification-list">
-          {notifications.filter((item) => !item.decision && (item.outcome === 'win' || item.outcome === 'loss')).slice(0, 5).map((notification) => {
+          {notifications.filter((item) => !item.decision && needsDecision(item)).slice(0, 5).map((notification) => {
             const rResult = Number(notification.r_result)
             const pnlUsd = Number(notification.risk_usd) * rResult
             return (
               <article className="notification-card" key={notification.id}>
                 <div className={`notification-side ${notification.direction}`}>{notification.direction}</div>
                 <div className="notification-main">
-                  <b>BTCUSDT · 1m CHoCH + FVG</b>
+                  <b>BTCUSDT · {notification.outcome === 'cancelled' ? 'Cancelled at 180 candles' : '1m CHoCH + FVG'}</b>
                   <span>{new Date(notification.detected_at).toLocaleString()} · 15m {notification.higher_timeframe_bias}</span>
                 </div>
-                <div className="notification-level"><small>Result</small><b className={rResult > 0 ? 'positive' : 'negative'}>{rResult > 0 ? '+' : ''}{rResult.toFixed(0)}R</b></div>
-                <div className="notification-level"><small>P&amp;L</small><b className={pnlUsd > 0 ? 'positive' : 'negative'}>{formatCurrency(pnlUsd, currency)}</b></div>
+                <div className="notification-level"><small>Result</small><b className={rResult > 0 ? 'positive' : rResult < 0 ? 'negative' : 'muted'}>{rResult > 0 ? '+' : ''}{rResult.toFixed(2)}R</b></div>
+                <div className="notification-level"><small>P&amp;L</small><b className={pnlUsd > 0 ? 'positive' : pnlUsd < 0 ? 'negative' : 'muted'}>{formatCurrency(pnlUsd, currency)}</b></div>
                 <div className="decision-actions">
                   <button type="button" className="accept" disabled={decidingId === notification.id} onClick={() => void decide(notification, 'accepted')} title="I took this trade">✓</button>
                   <button type="button" className="dismiss" disabled={decidingId === notification.id} onClick={() => void decide(notification, 'dismissed')} title="I did not take this trade">×</button>
@@ -102,7 +107,7 @@ export function Dashboard({ currency, onCurrencyChange, onOpenMarket }: Dashboar
 
       <section className="metric-grid">
         <MetricCard eyebrow="Net profit" value={formatCurrency(performance.totalPnlUsd, currency)} detail={`${signedR(performance.totalR)} all time`} tone={performance.totalPnlUsd >= 0 ? 'positive' : 'negative'} featured />
-        <MetricCard eyebrow="Overall win rate" value={`${performance.overallWinRate.toFixed(1)}%`} detail={`${performance.wins} wins · ${performance.losses} losses`} />
+        <MetricCard eyebrow="Overall win rate" value={`${performance.overallWinRate.toFixed(1)}%`} detail={`${performance.wins} wins · ${performance.losses} losses · ${performance.cancellations} cancelled`} />
         <MetricCard eyebrow="Today's win rate" value={`${performance.todayWinRate.toFixed(1)}%`} detail={`${performance.todayTrades} closed today`} />
         <MetricCard eyebrow="Today's result" value={signedR(performance.todayR)} detail="Risk-adjusted return" tone={performance.todayR >= 0 ? 'positive' : 'negative'} />
       </section>
@@ -155,18 +160,18 @@ export function Dashboard({ currency, onCurrencyChange, onOpenMarket }: Dashboar
       </section>
 
       <section className="panel signal-history">
-        <div className="panel-heading"><div><div className="overline">Signal history</div><h2>Accepted and skipped setups</h2></div><span className="muted">Check = portfolio · Cross = history only</span></div>
-        {notifications.filter((item) => item.decision).length === 0
+        <div className="panel-heading"><div><div className="overline">Signal history</div><h2>Accepted, skipped, and cancelled setups</h2></div><span className="muted">Check = portfolio · Cross = history only</span></div>
+        {historyNotifications.length === 0
           ? <div className="notice-empty">Your decisions will appear here.</div>
           : <div className="trade-table">
             <div className="trade-row signal-row trade-header"><span>Setup</span><span>Direction</span><span>Outcome</span><span>Decision</span><span>Result</span></div>
-            {notifications.filter((item) => item.decision).slice(0, 20).map((item) => (
+            {historyNotifications.slice(0, 20).map((item) => (
               <div className="trade-row signal-row" key={item.id}>
                 <span><b>BTCUSDT</b><small>{new Date(item.detected_at).toLocaleString()}</small></span>
                 <span className={item.direction}>{item.direction}</span>
                 <span>{item.outcome}</span>
-                <span className={item.decision === 'accepted' ? 'positive' : 'muted'}>{item.decision}</span>
-                <span className={Number(item.r_result) > 0 ? 'positive' : 'negative'}>{Number(item.r_result) > 0 ? '+' : ''}{Number(item.r_result).toFixed(0)}R</span>
+                <span className={item.decision === 'accepted' ? 'positive' : 'muted'}>{item.decision ?? 'automatic'}</span>
+                <span className={Number(item.r_result) > 0 ? 'positive' : Number(item.r_result) < 0 ? 'negative' : 'muted'}>{Number(item.r_result) > 0 ? '+' : ''}{Number(item.r_result).toFixed(2)}R</span>
               </div>
             ))}
           </div>}

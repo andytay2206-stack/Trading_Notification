@@ -51,6 +51,7 @@ export async function saveBacktestRun(config: BacktestConfig, result: BacktestRe
       winRate: result.winRate,
       wins: result.wins,
       losses: result.losses,
+      cancellations: result.cancellations,
       totalTrades: result.trades.length,
       maxDrawdownR: result.maxDrawdownR,
       config,
@@ -69,15 +70,20 @@ export interface StrategyNotification {
   entry_price: string
   stop_price: string
   target_price: string
+  exit_price: string | null
   risk_usd: string
-  outcome: 'waiting' | 'active' | 'win' | 'loss' | 'expired'
+  outcome: 'waiting' | 'active' | 'win' | 'loss' | 'cancelled'
   r_result: string
   decision: 'accepted' | 'dismissed' | null
   decided_at: string | null
 }
 
 export async function scanStrategy() {
-  return jsonRequest<{ scanned: number; bias: string }>('/api/strategy/scan', { method: 'POST' })
+  return jsonRequest<{ scanned: number; bias: string; startedAt: string }>('/api/strategy/scan', { method: 'POST' })
+}
+
+export async function getStrategyState() {
+  return jsonRequest<{ startedAt: string }>('/api/strategy/state')
 }
 
 export async function getStrategyNotifications() {
@@ -95,7 +101,7 @@ interface ApiTrade {
   id: string
   symbol: 'BTCUSDT'
   side: 'long' | 'short'
-  status: 'open' | 'win' | 'loss' | 'breakeven'
+  status: 'open' | 'win' | 'loss' | 'breakeven' | 'cancelled'
   entry_price: string
   exit_price: string | null
   risk_usd: string
