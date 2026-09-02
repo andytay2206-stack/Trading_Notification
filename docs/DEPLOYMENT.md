@@ -36,6 +36,8 @@ https://<railway-domain>/api/health
 
 It must return `{"status":"ok","database":"connected"}`.
 
+Opening the Railway domain without a path returns a small API status response and points to `/api/health`. Railway hosts the backend here; the full dashboard is served from the Vercel domain.
+
 ## 2. Vercel frontend
 
 Import the same GitHub repository into Vercel as a Vite project. Add this variable to Production and Preview:
