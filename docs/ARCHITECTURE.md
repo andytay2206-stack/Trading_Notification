@@ -32,7 +32,7 @@ Tables are created idempotently when the API starts. Later production deployment
 ## Backtesting flow
 
 ```text
-User-selected historical start/end window (up to 7 days)
+Random historical endpoint and 500/800/1,000-candle sample
               ↓
 Bybit historical candles
               ↓

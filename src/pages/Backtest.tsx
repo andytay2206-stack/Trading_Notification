@@ -1,27 +1,19 @@
 import { useMemo, useState } from 'react'
 import { CandleChart } from '../components/CandleChart'
 import { formatCurrency } from '../lib/currency'
-import { runStructureBacktest, type BacktestConfig, type BacktestResult } from '../lib/backtest'
+import { randomHistoricalEnd, runStructureBacktest, type BacktestConfig, type BacktestResult } from '../lib/backtest'
 import { alignedOneMinuteSetups, analyzeStructure, oneSetupAtATime } from '../lib/structureStrategy'
 import { fetchCandleRange } from '../services/bybit'
 import { saveBacktestRun } from '../services/api'
 import type { Candle } from '../types'
 
-const HOUR = 60 * 60 * 1_000
-const DAY = 24 * HOUR
-const MAX_TEST_WINDOW = 7 * DAY
+const MINUTE = 60 * 1_000
+const HOUR = 60 * MINUTE
 const WARMUP_WINDOW = 12 * HOUR
-
-const datetimeLocal = (timestamp: number) => {
-  const date = new Date(timestamp)
-  return new Date(timestamp - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
-}
-
-const initialEnd = Math.floor((Date.now() - HOUR) / 60_000) * 60_000
 
 const initialConfig: BacktestConfig = {
   interval: '1',
-  candleCount: 0,
+  candleCount: 1000,
   pivotLength: 2,
   stopBufferPercent: 5,
   rewardRisk: 4,
@@ -30,8 +22,6 @@ const initialConfig: BacktestConfig = {
 
 export function Backtest() {
   const [config, setConfig] = useState(initialConfig)
-  const [startAt, setStartAt] = useState(datetimeLocal(initialEnd - DAY))
-  const [endAt, setEndAt] = useState(datetimeLocal(initialEnd))
   const [candles, setCandles] = useState<Candle[]>([])
   const [windowStart, setWindowStart] = useState<number | null>(null)
   const [windowEnd, setWindowEnd] = useState<number | null>(null)
@@ -45,12 +35,8 @@ export function Backtest() {
     setLoading(true)
     setError(null)
     try {
-      const start = new Date(startAt).getTime()
-      const end = new Date(endAt).getTime()
-      if (!Number.isFinite(start) || !Number.isFinite(end) || start >= end) throw new Error('Choose a start time earlier than the end time')
-      if (end > Date.now()) throw new Error('The backtest end cannot be in the future')
-      if (end - start > MAX_TEST_WINDOW) throw new Error('Choose a historical window of 7 days or less')
-
+      const end = randomHistoricalEnd()
+      const start = end - (config.candleCount - 1) * MINUTE
       const warmupStart = start - WARMUP_WINDOW
       const [historicalCandles, biasCandles] = await Promise.all([
         fetchCandleRange('1', warmupStart, end),
@@ -96,8 +82,8 @@ export function Backtest() {
       <section className="page-heading market-heading">
         <div>
           <div className="overline">Strategy research</div>
-          <h1>Historical <span>backtest.</span></h1>
-          <p>Choose a fixed Bitcoin history window so repeated tests use the same market data.</p>
+          <h1>Random-window <span>backtest.</span></h1>
+          <p>Test the strategy against a randomly selected period of Bitcoin history.</p>
         </div>
         <span className="pill">BTCUSDT · Bybit</span>
       </section>
@@ -111,11 +97,12 @@ export function Backtest() {
 
           <div className="fixed-parameter"><span>Direction timeframe</span><b>15 minutes</b></div>
           <div className="fixed-parameter"><span>Execution timeframe</span><b>1 minute</b></div>
-          <label>Historical start
-            <input type="datetime-local" value={startAt} onChange={(event) => setStartAt(event.target.value)} />
-          </label>
-          <label>Historical end
-            <input type="datetime-local" value={endAt} onChange={(event) => setEndAt(event.target.value)} />
+          <label>Random sample size
+            <select value={config.candleCount} onChange={(event) => setConfig({ ...config, candleCount: Number(event.target.value) })}>
+              <option value={500}>500 candles</option>
+              <option value={800}>800 candles</option>
+              <option value={1000}>1,000 candles</option>
+            </select>
           </label>
           <label>Risk per trade (USD)
             <input type="number" min="1" step="10" value={config.riskUsd} onChange={(event) => setConfig({ ...config, riskUsd: Math.max(1, Number(event.target.value)) })} />
@@ -127,14 +114,14 @@ export function Backtest() {
           </label>
 
           <button className="run-button" type="button" onClick={run} disabled={loading}>
-            {loading ? 'Loading historical candles…' : 'Run historical backtest'} <span>↗</span>
+            {loading ? 'Selecting random history…' : 'Run random backtest'} <span>↗</span>
           </button>
-          <p className="control-note">Choose up to 7 days. A 12-hour warm-up establishes structure before the selected start. Results exclude fees, funding, slippage, and spread.</p>
+          <p className="control-note">Each run randomly selects an endpoint from two days to two years ago. A 12-hour warm-up establishes prior structure. Results exclude fees, funding, slippage, and spread.</p>
         </aside>
 
         <div className="backtest-results">
           {error && <div className="panel backtest-empty error"><b>Backtest data unavailable</b><span>{error}</span><button type="button" className="secondary-button" onClick={run}>Try again</button></div>}
-          {!error && !result && <div className="panel backtest-empty"><div className="empty-orbit">R</div><b>No period selected yet</b><span>Choose an older start and end time, then run the test against that exact historical window.</span></div>}
+          {!error && !result && <div className="panel backtest-empty"><div className="empty-orbit">R</div><b>No random sample yet</b><span>Run the backtest to draw a past candle window and calculate the strategy outcome.</span></div>}
           {!error && result && (
             <>
               <section className="backtest-metrics">
@@ -146,7 +133,7 @@ export function Backtest() {
 
               <section className="panel backtest-chart">
                 <div className="panel-heading">
-                  <div><div className="overline">Selected timeline</div><h2>Historical BTCUSDT</h2></div>
+                  <div><div className="overline">Random sample</div><h2>Historical BTCUSDT</h2></div>
                   <span className="muted">{first && last ? `${first.toLocaleString()} — ${last.toLocaleString()}` : ''}</span>
                 </div>
                 {selectedSetup && <div className="selected-trade-levels">

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Candle } from '../types'
-import { runStructureBacktest, type BacktestConfig } from './backtest'
+import { randomHistoricalEnd, runStructureBacktest, type BacktestConfig } from './backtest'
 
 const config: BacktestConfig = {
   interval: '1', candleCount: 1000, pivotLength: 1, stopBufferPercent: 5, rewardRisk: 4, riskUsd: 100,
@@ -38,5 +38,15 @@ describe('runStructureBacktest', () => {
     const oneMinute = candles(60)
     const result = runStructureBacktest(oneMinute, candles(900, 1_699_985_000), config, oneMinute.at(-1)!.time + 1)
     expect(result.trades).toHaveLength(0)
+  })
+})
+
+describe('randomHistoricalEnd', () => {
+  it('chooses a minute-aligned endpoint between two days and two years ago', () => {
+    const now = new Date('2026-09-01T00:00:00Z').getTime()
+    const end = randomHistoricalEnd(now, () => 0.5)
+    expect(end).toBeLessThanOrEqual(now - 2 * 86_400_000)
+    expect(end).toBeGreaterThanOrEqual(now - 732 * 86_400_000)
+    expect(end % 60_000).toBe(0)
   })
 })

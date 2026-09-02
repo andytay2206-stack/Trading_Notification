@@ -26,7 +26,7 @@ The two-candle confirmation means a pivot is known only after two later candles 
 - Swing structure first establishes whether the move is upward or downward.
 - During a downward structural leg, a new candle closing above the body edge of the preceding confirmed swing high creates bullish CHoCH.
 - During an upward structural leg, a new candle closing below the body edge of the preceding confirmed swing low creates bearish CHoCH.
-- The opposite swing formed after the broken level is the setup's invalidation extreme. For example, after a swing low at 01:17 and a new swing high at 01:25, the 01:27 close below the 01:17 low is bearish CHoCH and the 01:25 high is the invalidation extreme.
+- After the break level is identified, the engine scans the move between that broken swing and the CHoCH. For a bearish CHoCH it uses the highest closed candle-body point; for a bullish CHoCH it uses the lowest closed candle-body point. This is the stop's invalidation extreme.
 - Pivots are still found from candle wicks, but the break level is the swing candle's body edge. A wick through that level without a close beyond it does not qualify.
 
 ## Fair Value Gap (FVG)
@@ -35,7 +35,7 @@ The structural leg from the invalidation swing through the CHoCH must contain a 
 
 - Bullish FVG: the following candle's low is above the preceding candle's high.
 - Bearish FVG: the following candle's high is below the preceding candle's low.
-- If the leg contains multiple FVGs, the widest gap is selected as the dominant displacement zone.
+- If the leg contains multiple FVGs, the widest gap is treated as the most relevant displacement zone; a tie uses the gap nearest the CHoCH.
 - Entry is the 50% midpoint between the two FVG boundaries.
 - A selected setup has a total lifetime of 180 one-minute candles from its CHoCH candle.
 - No newer setup is considered while the selected setup is waiting, filled, or active.
@@ -46,8 +46,8 @@ This is the current precise interpretation of the requested gap inside the CHoCH
 
 ## Risk and outcome
 
-- Bullish stop: below the structural invalidation swing low by 5% of that swing candle's full high-low range.
-- Bearish stop: above the structural invalidation swing high by 5% of that swing candle's full high-low range.
+- Bullish stop: near and below the lowest closed candle-body point before CHoCH, buffered by 5% of that candle's full high-low range.
+- Bearish stop: near and above the highest closed candle-body point before CHoCH, buffered by 5% of that candle's full high-low range.
 - `1R` is the distance from FVG midpoint entry to that stop.
 - Target is exactly `4R` from entry.
 - If one candle contains both stop and target, the engine records the stop first (`−1R`) because candle data cannot reveal intrabar ordering.
@@ -84,5 +84,5 @@ The automated indicators do not prevent chart navigation. Use the mouse wheel to
 - Fees, funding, spread, and slippage are excluded.
 - The scanner currently runs when the dashboard requests a scan; an always-on background worker is still planned.
 - A maximum of 1,000 one-minute candles is evaluated per scan due to the upstream endpoint limit.
-- Backtests accept a fixed historical start/end window of up to seven days and load a 12-hour warm-up before it. This makes runs repeatable while giving the structure engine prior context.
+- Each backtest randomly selects a historical endpoint between two days and two years ago, then loads the chosen 500, 800, or 1,000-candle sample plus a 12-hour structural warm-up.
 - Strategy behavior should be reviewed visually against known examples before being treated as production trading guidance.

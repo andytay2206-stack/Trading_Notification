@@ -80,6 +80,27 @@ const inferTrend = (highs: SwingPoint[], lows: SwingPoint[]): TradeSide | 'neutr
   return 'neutral'
 }
 
+const bodyExtremeBetween = (
+  candles: Candle[],
+  fromIndex: number,
+  toIndex: number,
+  type: 'high' | 'low',
+  fallback: SwingPoint,
+): SwingPoint => {
+  let extreme: SwingPoint | undefined
+  for (let index = fromIndex; index <= toIndex; index += 1) {
+    const candle = candles[index]
+    if (!candle) continue
+    const price = type === 'high'
+      ? Math.max(candle.open, candle.close)
+      : Math.min(candle.open, candle.close)
+    if (!extreme || (type === 'high' && price >= extreme.price) || (type === 'low' && price <= extreme.price)) {
+      extreme = { time: candle.time, price, index, type }
+    }
+  }
+  return extreme ?? fallback
+}
+
 export function analyzeStructure(candles: Candle[], settings = defaultStructureSettings): StructureAnalysis {
   const swings = findSwingPoints(candles, settings.pivotLength)
   const chochEvents: ChochEvent[] = []
@@ -114,26 +135,32 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
 
     if (trend === 'short' && structuralHigh && structuralLow
       && candle.close > structuralHigh.price && structuralHigh.index > lastBreakIndex) {
+      const invalidationSwing = bodyExtremeBetween(
+        candles, structuralHigh.index + 1, index - 1, 'low', structuralLow,
+      )
       chochEvents.push({
         time: candle.time,
         price: candle.close,
         index,
         direction: 'long',
         brokenSwing: structuralHigh,
-        invalidationSwing: structuralLow,
+        invalidationSwing,
       })
       trend = 'long'
       biasChanges.push({ time: candle.time, direction: 'long' })
       lastBreakIndex = structuralHigh.index
     } else if (trend === 'long' && structuralHigh && structuralLow
       && candle.close < structuralLow.price && structuralLow.index > lastBreakIndex) {
+      const invalidationSwing = bodyExtremeBetween(
+        candles, structuralLow.index + 1, index - 1, 'high', structuralHigh,
+      )
       chochEvents.push({
         time: candle.time,
         price: candle.close,
         index,
         direction: 'short',
         brokenSwing: structuralLow,
-        invalidationSwing: structuralHigh,
+        invalidationSwing,
       })
       trend = 'short'
       biasChanges.push({ time: candle.time, direction: 'short' })

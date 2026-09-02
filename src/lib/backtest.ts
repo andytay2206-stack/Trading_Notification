@@ -95,3 +95,10 @@ export function runStructureBacktest(
     maxDrawdownR,
   }
 }
+
+export function randomHistoricalEnd(now = Date.now(), random = Math.random) {
+  const minimumAge = 2 * 24 * 60 * 60 * 1_000
+  const randomHistory = 730 * 24 * 60 * 60 * 1_000
+  const timestamp = now - minimumAge - random() * randomHistory
+  return Math.floor(timestamp / 60_000) * 60_000
+}
