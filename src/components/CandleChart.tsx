@@ -9,6 +9,7 @@ import {
   LineStyle,
   type CandlestickData,
   type IChartApi,
+  type IPriceLine,
   type ISeriesApi,
   type ISeriesMarkersPluginApi,
   type Time,
@@ -36,6 +37,7 @@ export function CandleChart({ candles, analysis, tradeSetups = [], setupQualific
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
   const overlaySeriesRef = useRef<Array<ISeriesApi<'Line'> | ISeriesApi<'Baseline'>>>([])
+  const tradePriceLinesRef = useRef<IPriceLine[]>([])
   const markerPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
   const firstTimeRef = useRef<number | null>(null)
   const followLatestRef = useRef(true)
@@ -121,6 +123,7 @@ export function CandleChart({ candles, analysis, tradeSetups = [], setupQualific
       seriesRef.current = null
       markerPluginRef.current = null
       overlaySeriesRef.current = []
+      tradePriceLinesRef.current = []
       firstTimeRef.current = null
       followLatestRef.current = true
     }
@@ -144,6 +147,10 @@ export function CandleChart({ candles, analysis, tradeSetups = [], setupQualific
     if (!chart || !analysis) return
     overlaySeriesRef.current.forEach((series) => chart.removeSeries(series))
     overlaySeriesRef.current = []
+    if (seriesRef.current) {
+      tradePriceLinesRef.current.forEach((line) => seriesRef.current?.removePriceLine(line))
+    }
+    tradePriceLinesRef.current = []
 
     const activeSetup = visibleSetup
     const latestTime = candles.at(-1)?.time ?? 0
@@ -178,11 +185,11 @@ export function CandleChart({ candles, analysis, tradeSetups = [], setupQualific
       const zone = chart.addSeries(BaselineSeries, {
         baseValue: { type: 'price', price: gap.bottom },
         relativeGradient: true,
-        topFillColor1: `rgba(${zoneColor}, .12)`,
-        topFillColor2: `rgba(${zoneColor}, .04)`,
+        topFillColor1: `rgba(${zoneColor}, .10)`,
+        topFillColor2: `rgba(${zoneColor}, .03)`,
         topLineColor: `rgba(${zoneColor}, 0)`,
-        bottomFillColor1: `rgba(${zoneColor}, .04)`,
-        bottomFillColor2: `rgba(${zoneColor}, .12)`,
+        bottomFillColor1: `rgba(${zoneColor}, .03)`,
+        bottomFillColor2: `rgba(${zoneColor}, .10)`,
         bottomLineColor: `rgba(${zoneColor}, 0)`,
         lineWidth: 1,
         lastValueVisible: false,
@@ -193,23 +200,6 @@ export function CandleChart({ candles, analysis, tradeSetups = [], setupQualific
         { time: gap.endTime as Time, value: gap.top },
       ])
       overlaySeriesRef.current.push(zone)
-
-      ;[gap.top, gap.bottom].forEach((price, boundaryIndex) => {
-        const line = chart.addSeries(LineSeries, {
-          color: gap.direction === 'long' ? 'rgba(57, 217, 138, .7)' : 'rgba(255, 92, 108, .7)',
-          lineWidth: boundaryIndex === 0 ? 2 : 1,
-          lineStyle: LineStyle.Dashed,
-          lastValueVisible: false,
-          priceLineVisible: false,
-          crosshairMarkerVisible: false,
-          title: boundaryIndex === 0 ? `${gap.direction === 'long' ? 'Bull' : 'Bear'} FVG` : '',
-        })
-        line.setData([
-          { time: gap.startTime as Time, value: price },
-          { time: gap.endTime as Time, value: price },
-        ])
-        overlaySeriesRef.current.push(line)
-      })
     })
 
     if (activeSetup) {
@@ -218,11 +208,11 @@ export function CandleChart({ candles, analysis, tradeSetups = [], setupQualific
       const rewardBand = chart.addSeries(BaselineSeries, {
         baseValue: { type: 'price', price: activeSetup.midpoint },
         relativeGradient: true,
-        topFillColor1: 'rgba(57, 217, 138, .18)',
-        topFillColor2: 'rgba(57, 217, 138, .06)',
+        topFillColor1: 'rgba(38, 166, 154, .24)',
+        topFillColor2: 'rgba(38, 166, 154, .09)',
         topLineColor: 'rgba(57, 217, 138, 0)',
-        bottomFillColor1: 'rgba(57, 217, 138, .06)',
-        bottomFillColor2: 'rgba(57, 217, 138, .18)',
+        bottomFillColor1: 'rgba(38, 166, 154, .09)',
+        bottomFillColor2: 'rgba(38, 166, 154, .24)',
         bottomLineColor: 'rgba(57, 217, 138, 0)',
         lineWidth: 1,
         lastValueVisible: false,
@@ -237,11 +227,11 @@ export function CandleChart({ candles, analysis, tradeSetups = [], setupQualific
       const riskBand = chart.addSeries(BaselineSeries, {
         baseValue: { type: 'price', price: activeSetup.midpoint },
         relativeGradient: true,
-        topFillColor1: 'rgba(255, 92, 108, .18)',
-        topFillColor2: 'rgba(255, 92, 108, .06)',
+        topFillColor1: 'rgba(239, 83, 80, .24)',
+        topFillColor2: 'rgba(239, 83, 80, .09)',
         topLineColor: 'rgba(255, 92, 108, 0)',
-        bottomFillColor1: 'rgba(255, 92, 108, .06)',
-        bottomFillColor2: 'rgba(255, 92, 108, .18)',
+        bottomFillColor1: 'rgba(239, 83, 80, .09)',
+        bottomFillColor2: 'rgba(239, 83, 80, .24)',
         bottomLineColor: 'rgba(255, 92, 108, 0)',
         lineWidth: 1,
         lastValueVisible: false,
@@ -259,20 +249,16 @@ export function CandleChart({ candles, analysis, tradeSetups = [], setupQualific
         { price: activeSetup.targetPrice, title: 'TARGET · +4R', color: '#39d98a', style: LineStyle.Solid },
       ]
       levels.forEach((level) => {
-        const line = chart.addSeries(LineSeries, {
+        const line = seriesRef.current?.createPriceLine({
+          price: level.price,
           color: level.color,
           lineWidth: 2,
           lineStyle: level.style,
-          lastValueVisible: true,
-          priceLineVisible: false,
-          crosshairMarkerVisible: false,
+          lineVisible: true,
+          axisLabelVisible: true,
           title: level.title,
         })
-        line.setData([
-          { time: activeSetup.startTime as Time, value: level.price },
-          { time: activeSetup.endTime as Time, value: level.price },
-        ])
-        overlaySeriesRef.current.push(line)
+        if (line) tradePriceLinesRef.current.push(line)
       })
     }
 

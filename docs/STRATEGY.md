@@ -64,11 +64,11 @@ The scanner tracks every valid setup virtually. When it resolves:
 
 ## Chart display policy
 
-To keep the automated chart readable, only the newest setup whose FVG is waiting for entry or whose virtual trade is active receives entry, stop, target, and risk/reward shading. Resolved and expired trade levels are removed. The reward area is translucent green from entry to target; the risk area is translucent red from entry to stop.
+To keep the automated chart readable, only the newest setup whose FVG is waiting for entry or whose virtual trade is active receives entry, stop, target, and risk/reward shading. Resolved and expired trade levels are removed immediately. Entry, stop, and target use viewport-wide price lines so they remain visible while navigating left or right. The reward area is translucent green from entry to target; the risk area is translucent red from entry to stop.
 
 The chart can show the newest CHoCH+FVG setup before higher-timeframe approval. It labels this as **Possible trade**. When its timestamp-aligned 15-minute direction agrees, the label changes to **Aligned trade** and it is eligible for notification tracking.
 
-CHoCH is drawn as an orange dashed break line and marker. Up to three direction-colored FVG zones remain visible for the latest one-hour window. Compact labeled trend lines connect the latest swing highs and swing lows. An active setup remains visible even if its originating CHoCH has just moved outside that one-hour context window. Colors and annotation hierarchy follow TradingView's dark-chart conventions.
+CHoCH is drawn as an orange dashed break line and marker. Up to three softly shaded, direction-colored FVG zones remain visible for the latest one-hour window without separate paired boundary lines. Compact labeled trend lines connect the latest swing highs and swing lows. An active setup remains visible even if its originating CHoCH has just moved outside that one-hour context window. Colors and annotation hierarchy follow TradingView's dark-chart conventions.
 
 The automated indicators do not prevent chart navigation. Use the mouse wheel to zoom, drag the chart to move through candle history, drag the time or price axis to rescale, and double-click an axis to reset it. Navigating away pauses automatic real-time following; **Latest candles** returns to the live edge.
 
