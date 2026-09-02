@@ -1,5 +1,6 @@
 import type { BacktestConfig, BacktestResult } from '../lib/backtest'
 import type { Candle } from '../types'
+import type { Trade } from '../types'
 
 export interface AuthUser {
   id: string
@@ -55,4 +56,68 @@ export async function saveBacktestRun(config: BacktestConfig, result: BacktestRe
       config,
     }),
   })
+}
+
+export interface StrategyNotification {
+  id: string
+  signal_key: string
+  direction: 'long' | 'short'
+  higher_timeframe_bias: 'long' | 'short' | 'neutral'
+  detected_at: string
+  entry_time: string | null
+  exit_time: string | null
+  entry_price: string
+  stop_price: string
+  target_price: string
+  risk_usd: string
+  outcome: 'waiting' | 'active' | 'win' | 'loss' | 'expired'
+  r_result: string
+  decision: 'accepted' | 'dismissed' | null
+  decided_at: string | null
+}
+
+export async function scanStrategy() {
+  return jsonRequest<{ scanned: number; bias: string }>('/api/strategy/scan', { method: 'POST' })
+}
+
+export async function getStrategyNotifications() {
+  return jsonRequest<{ notifications: StrategyNotification[] }>('/api/strategy/notifications')
+}
+
+export async function decideStrategyNotification(id: string, decision: 'accepted' | 'dismissed') {
+  return jsonRequest(`/api/strategy/notifications/${id}/decision`, {
+    method: 'PATCH',
+    body: JSON.stringify({ decision }),
+  })
+}
+
+interface ApiTrade {
+  id: string
+  symbol: 'BTCUSDT'
+  side: 'long' | 'short'
+  status: 'open' | 'win' | 'loss' | 'breakeven'
+  entry_price: string
+  exit_price: string | null
+  risk_usd: string
+  pnl_usd: string
+  r_multiple: string
+  opened_at: string
+  closed_at: string | null
+}
+
+export async function getPortfolioTrades(): Promise<Trade[]> {
+  const response = await jsonRequest<{ trades: ApiTrade[] }>('/api/trades')
+  return response.trades.map((trade) => ({
+    id: trade.id,
+    symbol: trade.symbol,
+    side: trade.side,
+    openedAt: trade.opened_at,
+    closedAt: trade.closed_at ?? undefined,
+    entryPrice: Number(trade.entry_price),
+    exitPrice: trade.exit_price ? Number(trade.exit_price) : undefined,
+    riskUsd: Number(trade.risk_usd),
+    pnlUsd: Number(trade.pnl_usd),
+    rMultiple: Number(trade.r_multiple),
+    outcome: trade.status,
+  }))
 }

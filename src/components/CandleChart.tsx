@@ -9,14 +9,16 @@ import {
   type CandlestickData,
   type IChartApi,
   type ISeriesApi,
+  type ISeriesMarkersPluginApi,
   type Time,
 } from 'lightweight-charts'
-import type { StructureAnalysis } from '../lib/structureStrategy'
+import type { FairValueGap, StructureAnalysis } from '../lib/structureStrategy'
 import type { Candle } from '../types'
 
 interface CandleChartProps {
   candles: Candle[]
   analysis?: StructureAnalysis
+  tradeSetups?: FairValueGap[]
 }
 
 const chartCandle = (candle: Candle): CandlestickData<Time> => ({
@@ -27,12 +29,12 @@ const chartCandle = (candle: Candle): CandlestickData<Time> => ({
   close: candle.close,
 })
 
-export function CandleChart({ candles, analysis }: CandleChartProps) {
+export function CandleChart({ candles, analysis, tradeSetups = [] }: CandleChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
   const overlaySeriesRef = useRef<ISeriesApi<'Line'>[]>([])
-  const markerPluginRef = useRef<ReturnType<typeof createSeriesMarkers> | null>(null)
+  const markerPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
   const firstTimeRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -68,10 +70,7 @@ export function CandleChart({ candles, analysis }: CandleChartProps) {
     chartRef.current = chart
     seriesRef.current = series
 
-    chart.applyOptions({
-      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
-      handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
-    })
+    chart.applyOptions({ handleScroll: false, handleScale: false })
     markerPluginRef.current = createSeriesMarkers(series, [])
 
     const observer = new ResizeObserver(() => chart.applyOptions({ width: container.clientWidth }))
@@ -93,10 +92,11 @@ export function CandleChart({ candles, analysis }: CandleChartProps) {
     const firstTime = candles[0].time
     if (firstTimeRef.current !== firstTime) {
       seriesRef.current.setData(candles.map(chartCandle))
-      chartRef.current?.timeScale().fitContent()
+      chartRef.current?.timeScale().setVisibleLogicalRange({ from: Math.max(0, candles.length - 140), to: candles.length + 4 })
       firstTimeRef.current = firstTime
     } else {
       seriesRef.current.update(chartCandle(candles.at(-1)!))
+      chartRef.current?.timeScale().scrollToRealTime()
     }
   }, [candles])
 
@@ -145,6 +145,30 @@ export function CandleChart({ candles, analysis }: CandleChartProps) {
       })
     })
 
+    tradeSetups.slice(-2).forEach((setup) => {
+      const levels = [
+        { price: setup.midpoint, title: 'ENTRY', color: '#dfbb74', style: LineStyle.Solid },
+        { price: setup.stopPrice, title: 'STOP · −1R', color: '#ff5c6c', style: LineStyle.Solid },
+        { price: setup.targetPrice, title: 'TARGET · +4R', color: '#39d98a', style: LineStyle.Solid },
+      ]
+      levels.forEach((level) => {
+        const line = chart.addSeries(LineSeries, {
+          color: level.color,
+          lineWidth: 2,
+          lineStyle: level.style,
+          lastValueVisible: true,
+          priceLineVisible: false,
+          crosshairMarkerVisible: false,
+          title: level.title,
+        })
+        line.setData([
+          { time: setup.startTime as Time, value: level.price },
+          { time: setup.endTime as Time, value: level.price },
+        ])
+        overlaySeriesRef.current.push(line)
+      })
+    })
+
     markerPluginRef.current?.setMarkers(analysis.chochEvents.slice(-20).map((event) => ({
       time: event.time as Time,
       position: event.direction === 'long' ? 'belowBar' as const : 'aboveBar' as const,
@@ -152,26 +176,12 @@ export function CandleChart({ candles, analysis }: CandleChartProps) {
       color: event.direction === 'long' ? '#39d98a' : '#ff5c6c',
       text: 'CHoCH',
     })))
-  }, [analysis])
-
-  const zoom = (factor: number) => {
-    const timeScale = chartRef.current?.timeScale()
-    const range = timeScale?.getVisibleLogicalRange()
-    if (!timeScale || !range) return
-    const center = (range.from + range.to) / 2
-    const halfSpan = ((range.to - range.from) * factor) / 2
-    timeScale.setVisibleLogicalRange({ from: center - halfSpan, to: center + halfSpan })
-  }
+  }, [analysis, tradeSetups])
 
   return (
     <div className="chart-wrap">
-      <div className="chart-tools" aria-label="Chart controls">
-        <button type="button" onClick={() => zoom(.75)} title="Zoom in">+</button>
-        <button type="button" onClick={() => zoom(1.35)} title="Zoom out">−</button>
-        <button type="button" onClick={() => chartRef.current?.timeScale().fitContent()} title="Fit chart">Fit</button>
-      </div>
+      <div className="chart-auto-label"><i />Automated strategy view</div>
       <div className="chart-canvas" ref={containerRef} />
-      <div className="chart-hint">Wheel to zoom · drag to scroll · pinch on touch</div>
     </div>
   )
 }

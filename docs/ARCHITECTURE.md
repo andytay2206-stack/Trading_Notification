@@ -24,6 +24,7 @@ The `admin` / `123admin` credentials are temporary development defaults and must
 - `trades`: persistent live or virtual trade lifecycles and R outcomes
 - `performance_snapshots`: historical dashboard aggregates
 - `backtest_runs`: strategy configuration, random period, win rate, profit, R, and drawdown for every completed test
+- `trade_notifications`: detected structural setups, virtual outcomes, and the user's accepted/dismissed decision
 
 Tables are created idempotently when the API starts. Later production deployment should replace this startup initialization with versioned migrations.
 
@@ -34,12 +35,32 @@ Random endpoint from previous 2 years
               ↓
 Bybit historical candles
               ↓
-Demo EMA 9/21 crossover engine
+15m structure bias + 1m CHoCH/FVG engine
               ↓
 Trade lifecycle → win rate / net R / USD profit / drawdown
 ```
 
-The demo engine enters after a fast/slow EMA crossover, uses one ATR as initial risk, and tests subsequent candle highs and lows against the stop and reward target. If both stop and target fall inside the same candle, the stop is assumed to occur first. This avoids overstating results when tick-level ordering is unavailable.
+The backtest and live scanner share the same deterministic strategy module. Each 1-minute setup uses only the 15-minute bias known at that setup's timestamp, preventing look-ahead bias. If both stop and target fall inside the same candle, the stop is assumed to occur first.
+
+## Automated strategy chart
+
+The chart is an output display rather than a manual analysis tool. Mouse/touch scrolling and scaling are disabled. It automatically follows recent Bybit BTCUSDT perpetual candles and renders:
+
+- dotted swing-structure trend segments;
+- CHoCH arrows at closed-candle breaks;
+- dashed upper/lower FVG boundaries;
+- a gold midpoint entry;
+- a red `−1R` stop;
+- a green `+4R` target.
+
+The chart, server scanner, notification outcomes, and backtester all consume the same strategy implementation.
+
+## Notification decisions
+
+The server scans 500 closed 15-minute candles and 1,000 closed 1-minute candles. Aligned setups are deduplicated in PostgreSQL. After a setup reaches its stop or target, the dashboard asks whether the user actually took it:
+
+- **Check:** adds the result to `trades`, portfolio profit, R, and win rate, while retaining notification history.
+- **Cross:** retains the setup in notification history but excludes it from portfolio performance.
 
 ## Performance definitions
 
@@ -51,10 +72,9 @@ The demo engine enters after a fast/slow EMA crossover, uses one ATR as initial 
 
 ## Current data limitations
 
-- Demonstration dashboard trades remain in memory; real tracked trades will use the PostgreSQL `trades` table.
 - IDR and MYR use labeled indicative rates, not a live FX feed.
-- The browser consumes Bybit's public endpoints without exchange authentication.
-- No final signal rules or notification provider exists yet.
+- The Node API consumes public Bybit/Bytick endpoints without exchange authentication.
+- Phone/email delivery providers are not connected yet; the in-app noticeboard is implemented.
 - Backtest results exclude fees, spread, funding, and slippage and must not be interpreted as live strategy evidence.
 
 ## Safety boundary
@@ -63,4 +83,4 @@ The app is notification-only. A future exchange connection should begin as read-
 
 ## Next architecture slice
 
-Once the strategy parameters are supplied, the next slice will add a deterministic signal engine with versioned rules, candle-close/intrabar evaluation semantics, signal deduplication, a persisted virtual trade lifecycle, and tests covering each entry and exit condition. Notification delivery should consume signal events rather than duplicate strategy logic.
+Add phone/email delivery as consumers of persisted signal events, then move the one-minute scanner into an always-on scheduled worker so it does not depend on the dashboard being open.

@@ -19,4 +19,5 @@ export const config = {
   bybitApiRegion: process.env.BYBIT_API_REGION || 'default',
   bybitBaseUrl: process.env.BYBIT_BASE_URL || undefined,
   bybitWsUrl: process.env.BYBIT_WS_URL || undefined,
+  strategyRiskUsd: Number(process.env.STRATEGY_RISK_USD || 100),
 }

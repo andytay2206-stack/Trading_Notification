@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Logo } from './components/Logo'
-import { demoTrades } from './data/demoTrades'
 import { Dashboard } from './pages/Dashboard'
 import { Market } from './pages/Market'
 import { Backtest } from './pages/Backtest'
@@ -72,7 +71,7 @@ export default function App() {
       </aside>
 
       <div className="content-shell">
-        {page === 'dashboard' && <Dashboard currency={currency} onCurrencyChange={setCurrency} trades={demoTrades} onOpenMarket={() => navigate('market')} />}
+        {page === 'dashboard' && <Dashboard currency={currency} onCurrencyChange={setCurrency} onOpenMarket={() => navigate('market')} />}
         {page === 'market' && <Market />}
         {page === 'backtest' && <Backtest />}
 

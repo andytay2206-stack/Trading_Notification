@@ -62,6 +62,34 @@ export async function initializeDatabase() {
       config JSONB NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS trade_notifications (
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+      signal_key TEXT NOT NULL,
+      symbol TEXT NOT NULL DEFAULT 'BTCUSDT',
+      direction TEXT NOT NULL CHECK (direction IN ('long', 'short')),
+      timeframe TEXT NOT NULL DEFAULT '1',
+      higher_timeframe_bias TEXT NOT NULL,
+      detected_at TIMESTAMPTZ NOT NULL,
+      entry_time TIMESTAMPTZ,
+      exit_time TIMESTAMPTZ,
+      entry_price NUMERIC(20, 8) NOT NULL,
+      stop_price NUMERIC(20, 8) NOT NULL,
+      target_price NUMERIC(20, 8) NOT NULL,
+      risk_usd NUMERIC(14, 2) NOT NULL,
+      outcome TEXT NOT NULL CHECK (outcome IN ('waiting', 'active', 'win', 'loss', 'expired')),
+      r_result NUMERIC(12, 4) NOT NULL DEFAULT 0,
+      decision TEXT CHECK (decision IN ('accepted', 'dismissed')),
+      decided_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (user_id, signal_key)
+    );
+
+    ALTER TABLE trades ADD COLUMN IF NOT EXISTS source_notification_id BIGINT;
+    CREATE UNIQUE INDEX IF NOT EXISTS trades_source_notification_unique
+      ON trades(source_notification_id) WHERE source_notification_id IS NOT NULL;
   `)
 
   const passwordHash = await bcrypt.hash(config.adminPassword, 12)

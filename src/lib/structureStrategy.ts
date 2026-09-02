@@ -1,4 +1,4 @@
-import type { Candle, TradeSide } from '../types'
+import type { Candle, TradeSide } from '../types.js'
 
 export interface SwingPoint {
   time: number
@@ -35,6 +35,7 @@ export interface StructureAnalysis {
   swings: SwingPoint[]
   chochEvents: ChochEvent[]
   fairValueGaps: FairValueGap[]
+  biasChanges: Array<{ time: number; direction: TradeSide }>
   bias: TradeSide | 'neutral'
 }
 
@@ -79,6 +80,7 @@ const inferTrend = (highs: SwingPoint[], lows: SwingPoint[]): TradeSide | 'neutr
 export function analyzeStructure(candles: Candle[], settings = defaultStructureSettings): StructureAnalysis {
   const swings = findSwingPoints(candles, settings.pivotLength)
   const chochEvents: ChochEvent[] = []
+  const biasChanges: Array<{ time: number; direction: TradeSide }> = []
   let trend: TradeSide | 'neutral' = 'neutral'
   let lastBreakIndex = -1
 
@@ -87,7 +89,10 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
     const highs = available.filter((swing) => swing.type === 'high')
     const lows = available.filter((swing) => swing.type === 'low')
     const inferred = inferTrend(highs, lows)
-    if (trend === 'neutral' && inferred !== 'neutral') trend = inferred
+    if (trend === 'neutral' && inferred !== 'neutral') {
+      trend = inferred
+      biasChanges.push({ time: candles[index].time, direction: inferred })
+    }
     const lastHigh = highs.at(-1)
     const lastLow = lows.at(-1)
     const candle = candles[index]
@@ -96,10 +101,12 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
     if (trend === 'short' && lastHigh && candle.close > lastHigh.price && previous.close <= lastHigh.price && lastHigh.index > lastBreakIndex) {
       chochEvents.push({ time: candle.time, price: candle.close, index, direction: 'long', brokenSwing: lastHigh })
       trend = 'long'
+      biasChanges.push({ time: candle.time, direction: 'long' })
       lastBreakIndex = lastHigh.index
     } else if (trend === 'long' && lastLow && candle.close < lastLow.price && previous.close >= lastLow.price && lastLow.index > lastBreakIndex) {
       chochEvents.push({ time: candle.time, price: candle.close, index, direction: 'short', brokenSwing: lastLow })
       trend = 'short'
+      biasChanges.push({ time: candle.time, direction: 'short' })
       lastBreakIndex = lastLow.index
     }
   }
@@ -164,10 +171,14 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
     return [gap]
   })
 
-  return { swings, chochEvents, fairValueGaps, bias: trend }
+  return { swings, chochEvents, fairValueGaps, biasChanges, bias: trend }
 }
 
 export function alignedOneMinuteSetups(oneMinute: StructureAnalysis, fifteenMinute: StructureAnalysis) {
-  if (fifteenMinute.bias === 'neutral') return []
-  return oneMinute.fairValueGaps.filter((gap) => gap.direction === fifteenMinute.bias)
+  return oneMinute.fairValueGaps.filter((gap) => {
+    const knownBias = fifteenMinute.biasChanges
+      .filter((change) => change.time <= gap.choch.time)
+      .at(-1)?.direction
+    return knownBias === gap.direction
+  })
 }

@@ -6,6 +6,7 @@ import { createSession, requireAuth, SESSION_COOKIE } from './auth.js'
 import { describeBybitError, restClient, subscribeToKline } from './bybit.js'
 import { config } from './config.js'
 import { closeDatabase, initializeDatabase, pool } from './db.js'
+import { decideNotification, scanStrategy } from './strategy.js'
 
 const app = express()
 const allowedIntervals = new Set(['1', '3', '5', '15', '30', '60', '120', '240', '360', '720', 'D', 'W', 'M'])
@@ -110,6 +111,36 @@ app.get('/api/trades', async (request, response) => {
   response.json({ trades: result.rows })
 })
 
+app.post('/api/strategy/scan', async (request, response) => {
+  try {
+    response.json(await scanStrategy(request.user!.id))
+  } catch (cause) {
+    console.error('[strategy scan]', describeBybitError(cause))
+    response.status(502).json({ error: 'Unable to scan the Bybit strategy candles' })
+  }
+})
+
+app.get('/api/strategy/notifications', async (request, response) => {
+  const result = await pool.query(
+    `SELECT id, signal_key, direction, higher_timeframe_bias, detected_at, entry_time, exit_time,
+       entry_price, stop_price, target_price, risk_usd, outcome, r_result, decision, decided_at
+     FROM trade_notifications WHERE user_id = $1 ORDER BY detected_at DESC LIMIT 100`,
+    [request.user!.id],
+  )
+  response.json({ notifications: result.rows })
+})
+
+app.patch('/api/strategy/notifications/:id/decision', async (request, response) => {
+  const decision = request.body?.decision
+  if (decision !== 'accepted' && decision !== 'dismissed') return response.status(400).json({ error: 'Decision must be accepted or dismissed' })
+  try {
+    const notification = await decideNotification(request.user!.id, request.params.id, decision)
+    response.json({ notification })
+  } catch (cause) {
+    response.status(409).json({ error: cause instanceof Error ? cause.message : 'Could not update notification' })
+  }
+})
+
 app.get('/api/performance/latest', async (request, response) => {
   const result = await pool.query(
     `SELECT total_profit_usd, total_r, overall_win_rate, today_win_rate, total_trades, captured_at
@@ -138,7 +169,7 @@ app.post('/api/backtests', async (request, response) => {
        net_profit_usd, net_r, win_rate, wins, losses, total_trades, max_drawdown_r, config)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
      RETURNING id, created_at`,
-    [request.user!.id, 'EMA 9/21 demo', body.interval, body.candleCount, body.windowStart, body.windowEnd,
+    [request.user!.id, '15m CHoCH / 1m FVG', body.interval, body.candleCount, body.windowStart, body.windowEnd,
       body.riskUsd, body.rewardRisk, body.netProfitUsd, body.netR, body.winRate, body.wins, body.losses,
       body.totalTrades, body.maxDrawdownR, JSON.stringify(body.config ?? {})],
   )

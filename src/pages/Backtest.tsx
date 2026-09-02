@@ -1,31 +1,25 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { CandleChart } from '../components/CandleChart'
 import { formatCurrency } from '../lib/currency'
-import { randomHistoricalEnd, runEmaBacktest, type BacktestConfig, type BacktestResult } from '../lib/backtest'
+import { randomHistoricalEnd, runStructureBacktest, type BacktestConfig, type BacktestResult } from '../lib/backtest'
+import { alignedOneMinuteSetups, analyzeStructure } from '../lib/structureStrategy'
 import { fetchCandles } from '../services/bybit'
 import { saveBacktestRun } from '../services/api'
-import type { Candle, CandleInterval } from '../types'
-
-const intervalOptions: Array<{ value: CandleInterval; label: string }> = [
-  { value: '15', label: '15 minutes' },
-  { value: '30', label: '30 minutes' },
-  { value: '60', label: '1 hour' },
-  { value: '240', label: '4 hours' },
-]
+import type { Candle } from '../types'
 
 const initialConfig: BacktestConfig = {
-  interval: '15',
-  candleCount: 500,
-  fastEma: 9,
-  slowEma: 21,
-  atrPeriod: 14,
-  rewardRisk: 2,
+  interval: '1',
+  candleCount: 1000,
+  pivotLength: 2,
+  stopBufferPercent: 5,
+  rewardRisk: 4,
   riskUsd: 100,
 }
 
 export function Backtest() {
   const [config, setConfig] = useState(initialConfig)
   const [candles, setCandles] = useState<Candle[]>([])
+  const [fifteenMinuteCandles, setFifteenMinuteCandles] = useState<Candle[]>([])
   const [result, setResult] = useState<BacktestResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -34,13 +28,15 @@ export function Backtest() {
     setLoading(true)
     setError(null)
     try {
-      const historicalCandles = await fetchCandles(config.interval, undefined, {
-        limit: config.candleCount,
-        end: randomHistoricalEnd(),
-      })
-      const backtestResult = runEmaBacktest(historicalCandles, config)
+      const end = randomHistoricalEnd()
+      const [historicalCandles, biasCandles] = await Promise.all([
+        fetchCandles('1', undefined, { limit: config.candleCount, end }),
+        fetchCandles('15', undefined, { limit: 500, end }),
+      ])
+      const backtestResult = runStructureBacktest(historicalCandles, biasCandles, config)
       await saveBacktestRun(config, backtestResult, historicalCandles)
       setCandles(historicalCandles)
+      setFifteenMinuteCandles(biasCandles)
       setResult(backtestResult)
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : 'The historical candle request failed')
@@ -51,6 +47,9 @@ export function Backtest() {
 
   const first = candles.at(0)
   const last = candles.at(-1)
+  const chartAnalysis = useMemo(() => analyzeStructure(candles), [candles])
+  const biasAnalysis = useMemo(() => analyzeStructure(fifteenMinuteCandles), [fifteenMinuteCandles])
+  const chartSetups = useMemo(() => alignedOneMinuteSetups(chartAnalysis, biasAnalysis), [chartAnalysis, biasAnalysis])
 
   return (
     <main>
@@ -63,21 +62,17 @@ export function Backtest() {
         <span className="pill">BTCUSDT · Bybit</span>
       </section>
 
-      <div className="demo-banner"><span>Demo strategy</span> EMA 9/21 crossover with a 1 ATR stop and 2R target. This will be replaced by your exact rules.</div>
+      <div className="demo-banner"><span>Structure strategy</span> 15m directional bias · 1m CHoCH · three-candle FVG midpoint entry · 5% candle-range stop buffer · 4R target.</div>
 
       <section className="backtest-layout">
         <aside className="panel backtest-controls">
           <div className="overline">Test parameters</div>
           <h2>Configure the run</h2>
 
-          <label>Chart timeframe
-            <select value={config.interval} onChange={(event) => setConfig({ ...config, interval: event.target.value as CandleInterval })}>
-              {intervalOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-          </label>
+          <div className="fixed-parameter"><span>Direction timeframe</span><b>15 minutes</b></div>
+          <div className="fixed-parameter"><span>Execution timeframe</span><b>1 minute</b></div>
           <label>Test duration
             <select value={config.candleCount} onChange={(event) => setConfig({ ...config, candleCount: Number(event.target.value) })}>
-              <option value={300}>300 candles</option>
               <option value={500}>500 candles</option>
               <option value={800}>800 candles</option>
               <option value={1000}>1,000 candles</option>
@@ -88,10 +83,7 @@ export function Backtest() {
           </label>
           <label>Reward target
             <select value={config.rewardRisk} onChange={(event) => setConfig({ ...config, rewardRisk: Number(event.target.value) })}>
-              <option value={1}>1R</option>
-              <option value={1.5}>1.5R</option>
-              <option value={2}>2R</option>
-              <option value={3}>3R</option>
+              <option value={4}>4R</option>
             </select>
           </label>
 
@@ -118,7 +110,7 @@ export function Backtest() {
                   <div><div className="overline">Random sample</div><h2>Historical BTCUSDT</h2></div>
                   <span className="muted">{first && last ? `${new Date(first.time * 1000).toLocaleDateString()} — ${new Date(last.time * 1000).toLocaleDateString()}` : ''}</span>
                 </div>
-                <CandleChart candles={candles} />
+                <CandleChart candles={candles} analysis={chartAnalysis} tradeSetups={chartSetups} />
               </section>
 
               <section className="panel trade-table-panel backtest-trades">

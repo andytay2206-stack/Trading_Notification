@@ -18,8 +18,11 @@ Northstar is a notification-first futures monitor. A React interface talks to a 
 - Random historical-window backtesting with win rate, profit, net R, and drawdown results
 - Login-protected workspace with an HTTP-only session cookie and sidebar logout
 - PostgreSQL storage for users, trades, performance snapshots, and completed backtests
+- Automated, non-interactive strategy chart with swing structure, CHoCH, FVG, entry, stop, and 4R target overlays
+- Timestamp-aligned 15-minute bias and 1-minute setup scanning
+- Persistent notification board with portfolio acceptance and history-only dismissal
 
-The initial ledger contains clearly labeled demonstration trades. Currency conversions use indicative fixed rates until a live foreign-exchange provider is selected.
+Portfolio metrics are calculated only from completed notifications that the user confirms were taken. Currency conversions use indicative fixed rates until a live foreign-exchange provider is selected.
 
 ## Run locally
 
@@ -67,11 +70,12 @@ This executes unit tests for performance calculations and creates a production b
 ## Documentation
 
 - [Architecture and data flow](docs/ARCHITECTURE.md)
+- [Strategy rules and assumptions](docs/STRATEGY.md)
 - [Product roadmap](docs/ROADMAP.md)
 
 ## Backtesting status
 
-The page currently runs a clearly labeled demonstration strategy: EMA 9/21 crossover, one ATR of initial risk, and a configurable reward target. Each run selects a random endpoint between two days and two years ago and requests up to 1,000 historical Bybit candles. Fees, funding, slippage, and spread are not included. The demo rules will be replaced when the owner's strategy parameters are supplied.
+The backtester uses the same structural strategy as the live scanner: timestamp-aligned 15-minute direction, 1-minute CHoCH, three-candle FVG midpoint entry, a stop 5% of the CHoCH candle range beyond its wick, and a 4R target. Each run selects a random endpoint between two days and two years ago. Fees, funding, slippage, and spread are not included.
 
 ## Development workflow
 

@@ -8,27 +8,23 @@
 - Live Bybit BTC perpetual chart
 - Sidebar navigation
 - Resilient WebSocket plus REST-polling market feed
-- Random-window demo backtesting engine
+- Random-window structural-strategy backtesting engine
 - Node `bybit-api` market-data gateway
 - PostgreSQL persistence foundation
 - Administrator login and logout
 
 ## Phase 2 — Strategy specification
 
-- Define exact indicators and parameters
-- Decide whether conditions are evaluated intrabar or only at candle close
-- Define long and short entry conditions
-- Define stop-loss, target, invalidation, and expiry rules
-- Create executable examples and edge-case tests before enabling signals
-- Replace the demonstration EMA strategy in both backtesting and live monitoring
+- Review swing-pivot length against visual examples
+- Confirm FVG wick/body boundaries and midpoint entry behavior
+- Confirm the 5% buffer means CHoCH candle range, not market price
+- Add more known bullish and bearish example fixtures
 
 ## Phase 3 — Signal and virtual trade tracking
 
-- Evaluate each relevant candle
-- Deduplicate repeated signals
-- Record entry, risk, stop, targets, and lifecycle state
-- Determine win, loss, breakeven, and R result from subsequent candles
-- Persist the journal across restarts
+- Move scanning from dashboard-triggered requests to an always-on worker
+- Add strategy-version identifiers and migration behavior
+- Add stale-feed and missed-candle recovery
 
 ## Phase 4 — Notifications
 
