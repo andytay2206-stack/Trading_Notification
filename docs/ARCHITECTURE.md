@@ -44,7 +44,7 @@ The backtest and live scanner share the same deterministic strategy module. Each
 
 ## Automated strategy chart
 
-The chart is built with TradingView Lightweight Charts but is an automated output display rather than a manual analysis tool. Mouse/touch scrolling and scaling are disabled. It automatically follows recent Bybit BTCUSDT perpetual candles and renders:
+The chart is built with TradingView Lightweight Charts. Its strategy annotations are automated, while the view supports cursor and touch navigation. Mouse-wheel or pinch gestures zoom, dragging moves through candle history, dragging either axis changes its scale, and double-clicking an axis resets it. Live updates stop forcing the chart back to real time after the user navigates away; **Latest candles** restores the live view. It renders:
 
 - dotted swing-structure trend segments;
 - CHoCH arrows at closed-candle breaks;

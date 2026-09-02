@@ -18,7 +18,7 @@ Northstar is a notification-first futures monitor. A React interface talks to a 
 - Random historical-window backtesting with win rate, profit, net R, and drawdown results
 - Login-protected workspace with an HTTP-only session cookie and sidebar logout
 - PostgreSQL storage for users, trades, performance snapshots, and completed backtests
-- Automated, non-interactive strategy chart using TradingView Lightweight Charts styling, with one hour of CHoCH/FVG context and the newest active 1R/4R setup
+- Automated strategy indicators on a navigable TradingView Lightweight Charts view, with one hour of CHoCH/FVG context and the newest active 1R/4R setup
 - Timestamp-aligned 15-minute bias and 1-minute setup scanning
 - Persistent notification board with portfolio acceptance and history-only dismissal
 

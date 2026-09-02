@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   BaselineSeries,
   CandlestickSeries,
@@ -37,6 +37,17 @@ export function CandleChart({ candles, analysis, tradeSetups = [] }: CandleChart
   const overlaySeriesRef = useRef<Array<ISeriesApi<'Line'> | ISeriesApi<'Baseline'>>>([])
   const markerPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
   const firstTimeRef = useRef<number | null>(null)
+  const followLatestRef = useRef(true)
+  const [isFollowingLatest, setIsFollowingLatest] = useState(true)
+
+  const showLatestCandles = () => {
+    const chart = chartRef.current
+    if (!chart || candles.length === 0) return
+    followLatestRef.current = true
+    setIsFollowingLatest(true)
+    chart.priceScale('right').applyOptions({ autoScale: true })
+    chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, candles.length - 140), to: candles.length + 4 })
+  }
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -58,7 +69,24 @@ export function CandleChart({ candles, analysis, tradeSetups = [] }: CandleChart
         horzLine: { color: '#5f6b82', labelBackgroundColor: '#252b37' },
       },
       rightPriceScale: { borderColor: '#2a2e39', scaleMargins: { top: 0.08, bottom: 0.08 } },
-      timeScale: { borderColor: '#2a2e39', timeVisible: true, secondsVisible: false },
+      timeScale: {
+        borderColor: '#2a2e39',
+        timeVisible: true,
+        secondsVisible: false,
+        rightOffset: 4,
+      },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseMove: true,
+        horzTouchDrag: true,
+        vertTouchDrag: true,
+      },
+      handleScale: {
+        mouseWheel: true,
+        pinch: true,
+        axisPressedMouseMove: { time: true, price: true },
+        axisDoubleClickReset: { time: true, price: true },
+      },
     })
     const series = chart.addSeries(CandlestickSeries, {
       upColor: '#26a69a',
@@ -71,20 +99,28 @@ export function CandleChart({ candles, analysis, tradeSetups = [] }: CandleChart
     chartRef.current = chart
     seriesRef.current = series
 
-    chart.applyOptions({ handleScroll: false, handleScale: false })
     markerPluginRef.current = createSeriesMarkers(series, [])
+
+    const handleVisibleRangeChange = () => {
+      const followingLatest = chart.timeScale().scrollPosition() <= 0
+      followLatestRef.current = followingLatest
+      setIsFollowingLatest(followingLatest)
+    }
+    chart.timeScale().subscribeVisibleLogicalRangeChange(handleVisibleRangeChange)
 
     const observer = new ResizeObserver(() => chart.applyOptions({ width: container.clientWidth }))
     observer.observe(container)
 
     return () => {
       observer.disconnect()
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(handleVisibleRangeChange)
       chart.remove()
       chartRef.current = null
       seriesRef.current = null
       markerPluginRef.current = null
       overlaySeriesRef.current = []
       firstTimeRef.current = null
+      followLatestRef.current = true
     }
   }, [])
 
@@ -97,7 +133,7 @@ export function CandleChart({ candles, analysis, tradeSetups = [] }: CandleChart
       firstTimeRef.current = firstTime
     } else {
       seriesRef.current.update(chartCandle(candles.at(-1)!))
-      chartRef.current?.timeScale().scrollToRealTime()
+      if (followLatestRef.current) chartRef.current?.timeScale().scrollToRealTime()
     }
   }, [candles])
 
@@ -270,6 +306,10 @@ export function CandleChart({ candles, analysis, tradeSetups = [] }: CandleChart
   return (
     <div className="chart-wrap">
       <div className="chart-auto-label"><i />Automated strategy view</div>
+      <div className="chart-navigation">
+        <span>Wheel: zoom · Drag: move · Drag axes: scale · Double-click axes: reset</span>
+        {!isFollowingLatest && <button type="button" onClick={showLatestCandles}>Latest candles</button>}
+      </div>
       <div className="chart-canvas" ref={containerRef} />
     </div>
   )

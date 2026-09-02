@@ -65,6 +65,8 @@ To keep the automated chart readable, only the newest setup whose FVG is waiting
 
 CHoCH is drawn as an orange dashed break line and marker. Up to three direction-colored FVG zones remain visible for the latest one-hour window. Compact labeled trend lines connect the latest swing highs and swing lows. An active setup remains visible even if its originating CHoCH has just moved outside that one-hour context window. Colors and annotation hierarchy follow TradingView's dark-chart conventions.
 
+The automated indicators do not prevent chart navigation. Use the mouse wheel to zoom, drag the chart to move through candle history, drag the time or price axis to rescale, and double-click an axis to reset it. Navigating away pauses automatic real-time following; **Latest candles** returns to the live edge.
+
 ## Known limitations
 
 - Fees, funding, spread, and slippage are excluded.

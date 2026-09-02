@@ -162,8 +162,12 @@ h2 { font: 600 20px Manrope, sans-serif; letter-spacing: -.025em; margin-bottom:
 .indicator-legend .fvg-line { border-top: 2px dashed var(--green); }
 .indicator-legend b { margin-left: auto; font-weight: 500; }
 .chart-wrap { position: relative; }
-.chart-auto-label { position: absolute; z-index: 3; top: 12px; left: 15px; display: flex; align-items: center; gap: 7px; color: #656d7a; background: rgba(14, 17, 24, .8); border: 1px solid #272d37; padding: 6px 8px; font: 400 7px 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .08em; pointer-events: none; }
+.chart-auto-label { position: absolute; z-index: 3; top: 42px; left: 15px; display: flex; align-items: center; gap: 7px; color: #656d7a; background: rgba(14, 17, 24, .8); border: 1px solid #272d37; padding: 6px 8px; font: 400 7px 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .08em; pointer-events: none; }
 .chart-auto-label i { width: 5px; height: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
+.chart-navigation { min-height: 30px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 0 8px; color: #7d8595; background: #10141d; border-bottom: 1px solid #272d37; font: 400 8px 'DM Mono', monospace; }
+.chart-navigation span { white-space: nowrap; }
+.chart-navigation button { border: 1px solid #2962ff; border-radius: 2px; padding: 5px 9px; color: #dbe5ff; background: rgba(41, 98, 255, .2); font: inherit; text-transform: uppercase; cursor: pointer; }
+.chart-navigation button:hover { background: rgba(41, 98, 255, .38); }
 .chart-canvas { width: 100%; height: 510px; }
 .chart-loading, .chart-error { height: 510px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--muted); gap: 15px; font-size: 11px; }
 .chart-loading i { width: 25px; height: 25px; border: 1px solid #3b424e; border-top-color: var(--gold); border-radius: 50%; animation: spin .8s linear infinite; }
@@ -276,6 +280,7 @@ footer small { margin-left: auto; font: 400 8px 'DM Mono', monospace; text-trans
   .instrument { min-width: 150px; }
   .interval-bar { overflow-x: auto; }
   .last-update { display: none; }
+  .chart-navigation span { display: none; }
   .backtest-controls { grid-template-columns: 1fr; }
   .backtest-controls .overline, .backtest-controls h2, .backtest-controls .run-button, .backtest-controls .control-note { grid-column: auto; }
   .backtest-metrics { grid-template-columns: 1fr 1fr; }
