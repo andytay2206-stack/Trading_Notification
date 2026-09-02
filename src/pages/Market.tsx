@@ -111,12 +111,10 @@ export function Market() {
   const fifteenMinuteAnalysis = useMemo(() => analyzeStructure(fifteenMinuteCandles.filter((candle) => candle.confirmed)), [fifteenMinuteCandles])
   const alignedSetups = useMemo(() => interval === '1' ? alignedOneMinuteSetups(analysis, fifteenMinuteAnalysis) : [], [analysis, fifteenMinuteAnalysis, interval])
   const chartSetups = useMemo(
-    () => interval === '1' ? analysis.fairValueGaps.filter((setup) => setup.status === 'open' || setup.status === 'filled').slice(-1) : [],
+    () => interval === '1' ? analysis.fairValueGaps.filter((setup) => setup.status === 'open' || setup.status === 'filled') : [],
     [analysis, interval],
   )
-  const chartSetupQualification = chartSetups[0] && alignedSetups.some((setup) => setup.id === chartSetups[0].id)
-    ? 'aligned' as const
-    : 'candidate' as const
+  const alignedSetupIds = useMemo(() => alignedSetups.map((setup) => setup.id), [alignedSetups])
 
   const selectInterval = (nextInterval: CandleInterval) => {
     if (nextInterval === interval) return
@@ -170,7 +168,7 @@ export function Market() {
           </div>
           {error && candles.length === 0
             ? <div className="chart-error"><b>Market data unavailable</b><span>{error}. Check the connection and retry.</span><button type="button" className="secondary-button" onClick={() => setReloadKey((key) => key + 1)}>Retry feed</button></div>
-            : candles.length ? <CandleChart key={interval} candles={candles} analysis={analysis} tradeSetups={chartSetups} setupQualification={chartSetupQualification} /> : <div className="chart-loading"><i /><span>Loading Bybit candles…</span></div>}
+            : candles.length ? <CandleChart key={interval} candles={candles} analysis={analysis} tradeSetups={chartSetups} alignedSetupIds={alignedSetupIds} /> : <div className="chart-loading"><i /><span>Loading Bybit candles…</span></div>}
         </div>
 
         <aside className="trade-rail">

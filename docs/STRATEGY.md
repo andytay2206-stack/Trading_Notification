@@ -37,6 +37,7 @@ The CHoCH candle must also be the middle displacement candle of a three-candle p
 - Bearish FVG: the following candle's high is below the preceding candle's low.
 - Entry is the 50% midpoint between the two FVG boundaries.
 - Entry remains eligible for 120 one-minute candles.
+- Once filled, the trade continues to be evaluated against its stop and target for every later available candle; the 120-candle limit applies only while waiting for entry.
 
 In the documented live example, 01:27 is the middle CHoCH/displacement candle; 01:26 and 01:28 provide the two non-overlapping wick boundaries.
 
@@ -64,11 +65,11 @@ The scanner tracks every valid setup virtually. When it resolves:
 
 ## Chart display policy
 
-To keep the automated chart readable, only the newest setup whose FVG is waiting for entry or whose virtual trade is active receives entry, stop, target, and risk/reward shading. Resolved and expired trade levels are removed immediately. Entry, stop, and target use viewport-wide price lines so they remain visible while navigating left or right. The reward area is translucent green from entry to target; the risk area is translucent red from entry to stop.
+Every setup whose FVG is waiting for entry or whose virtual trade is active retains its entry, stop, target, and risk/reward shading until it resolves. Won, lost, and expired trade levels are removed immediately. Entry, stop, and target use viewport-wide price lines so they remain visible while navigating left or right. The reward area is translucent green from entry to target; the risk area is translucent red from entry to stop.
 
-The chart can show the newest CHoCH+FVG setup before higher-timeframe approval. It labels this as **Possible trade**. When its timestamp-aligned 15-minute direction agrees, the label changes to **Aligned trade** and it is eligible for notification tracking.
+Each unresolved setup receives a time-stamped candle tag. Short tags sit above their entry or CHoCH candle, while long tags sit below it so separate trades remain identifiable without occupying the same candle area. Green tags are aligned with the timestamp-specific 15-minute direction; gold tags are visual candidates that are not notification-eligible.
 
-CHoCH is drawn as an orange dashed break line and marker. Up to three softly shaded, direction-colored FVG zones remain visible for the latest one-hour window without separate paired boundary lines. Compact labeled trend lines connect the latest swing highs and swing lows. An active setup remains visible even if its originating CHoCH has just moved outside that one-hour context window. Colors and annotation hierarchy follow TradingView's dark-chart conventions.
+CHoCH is drawn as an orange dashed break line and marker. Three recent softly shaded, direction-colored FVG zones remain visible for context, along with every unresolved setup even if its originating CHoCH has moved outside the one-hour window. Compact labeled trend lines connect the latest swing highs and swing lows. Colors and annotation hierarchy follow TradingView's dark-chart conventions.
 
 The automated indicators do not prevent chart navigation. Use the mouse wheel to zoom, drag the chart to move through candle history, drag the time or price axis to rescale, and double-click an axis to reset it. Navigating away pauses automatic real-time following; **Latest candles** returns to the live edge.
 

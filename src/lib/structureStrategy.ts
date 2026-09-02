@@ -166,10 +166,14 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
       status: 'open',
     }
 
-    const evaluationEnd = Math.min(candles.length, choch.index + 2 + settings.maxEntryWaitCandles)
-    for (let index = choch.index + 2; index < evaluationEnd; index += 1) {
+    const entryDeadline = choch.index + 2 + settings.maxEntryWaitCandles
+    for (let index = choch.index + 2; index < candles.length; index += 1) {
       const candle = candles[index]
       if (!gap.entryTime) {
+        if (index >= entryDeadline) {
+          gap.status = 'expired'
+          break
+        }
         if (candle.low <= midpoint && candle.high >= midpoint) {
           gap.entryTime = candle.time
           gap.status = 'filled'
@@ -189,7 +193,6 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
         break
       }
     }
-    if (!gap.entryTime && evaluationEnd < candles.length) gap.status = 'expired'
     return [gap]
   })
 

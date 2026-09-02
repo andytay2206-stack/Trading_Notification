@@ -40,7 +40,7 @@ describe('market structure strategy', () => {
     expect(analysis.bias).toBe('neutral')
   })
 
-  it('creates a bullish CHoCH FVG with buffered stop and a 4R target', () => {
+  it('keeps tracking a filled trade after its entry-wait window until the 4R target', () => {
     const data = [
       candle(0, 10, 10.5, 9.5, 10),
       candle(1, 10, 12, 9.8, 11),
@@ -57,7 +57,7 @@ describe('market structure strategy', () => {
       candle(12, 10, 16.8, 9.8, 16.5),
       candle(13, 16, 16.1, 15, 15.5),
     ]
-    const analysis = analyzeStructure(data, { pivotLength: 1, stopBufferPercent: 5, rewardRisk: 4, maxEntryWaitCandles: 20 })
+    const analysis = analyzeStructure(data, { pivotLength: 1, stopBufferPercent: 5, rewardRisk: 4, maxEntryWaitCandles: 1 })
     const bullish = analysis.fairValueGaps.find((gap) => gap.direction === 'long')
 
     expect(bullish).toBeDefined()

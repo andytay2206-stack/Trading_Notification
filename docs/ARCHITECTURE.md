@@ -53,11 +53,11 @@ The chart is built with TradingView Lightweight Charts. Its strategy annotations
 - a red `−1R` stop;
 - a green `+4R` target.
 
-Only the newest waiting/active setup receives viewport-wide price levels. A counter-bias setup is visibly labeled **Possible trade**; a setup matching the timestamp-aligned 15-minute direction is labeled **Aligned trade** and can enter notification tracking. Resolved trade overlays and price lines are removed automatically. Translucent green and red bands visualize reward and risk respectively. The chart retains orange structural-swing CHoCH break lines and up to three softly shaded FVGs from the latest hour, plus compact labeled swing-high and swing-low trend lines.
+Every waiting or active setup receives viewport-wide price levels and remains visible until it wins, loses, or expires. Time-stamped short tags are placed above their setup candle and long tags below it; green indicates timestamp-aligned notification eligibility and gold indicates a visual counter-bias candidate. Resolved trade overlays and price lines are removed automatically. Translucent green and red bands visualize reward and risk respectively. The chart retains orange structural-swing CHoCH break lines, three recent softly shaded FVGs plus every unresolved gap, and compact labeled swing-high and swing-low trend lines.
 
 Live updates modify only new candle data. Strategy overlays are rebuilt only when a candle closes, not for every update to the current candle. Rolling the 300-candle window no longer resets the visible range, and trade overlays are excluded from automatic price scaling so a distant 4R target cannot compress the candle view into an apparently blank chart.
 
-Pending signals carry a strategy version. `structure-v3` identifies the confirmed-structural-swing CHoCH rule; unresolved signals from older definitions are excluded from the current noticeboard, while user-decided history remains preserved.
+Pending signals carry a strategy version. `structure-v4` identifies confirmed-structural-swing CHoCH plus post-entry tracking that continues beyond the entry-wait window; unresolved signals from older definitions are excluded from the current noticeboard, while user-decided history remains preserved.
 
 The chart, server scanner, notification outcomes, and backtester all consume the same strategy implementation.
 

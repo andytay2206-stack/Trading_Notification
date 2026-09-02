@@ -20,7 +20,7 @@ interface CandleChartProps {
   candles: Candle[]
   analysis?: StructureAnalysis
   tradeSetups?: FairValueGap[]
-  setupQualification?: 'aligned' | 'candidate'
+  alignedSetupIds?: string[]
 }
 
 const chartCandle = (candle: Candle): CandlestickData<Time> => ({
@@ -31,7 +31,12 @@ const chartCandle = (candle: Candle): CandlestickData<Time> => ({
   close: candle.close,
 })
 
-export function CandleChart({ candles, analysis, tradeSetups = [], setupQualification = 'aligned' }: CandleChartProps) {
+const setupTimeLabel = (time: number) => new Date(time * 1000).toLocaleTimeString([], {
+  hour: '2-digit',
+  minute: '2-digit',
+})
+
+export function CandleChart({ candles, analysis, tradeSetups = [], alignedSetupIds }: CandleChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
@@ -40,7 +45,8 @@ export function CandleChart({ candles, analysis, tradeSetups = [], setupQualific
   const lastSeriesTimeRef = useRef<number | null>(null)
   const followLatestRef = useRef(true)
   const [isFollowingLatest, setIsFollowingLatest] = useState(true)
-  const visibleSetup = tradeSetups.filter((setup) => setup.status === 'open' || setup.status === 'filled').at(-1)
+  const visibleSetups = tradeSetups.filter((setup) => setup.status === 'open' || setup.status === 'filled')
+  const alignedSetupIdSet = new Set(alignedSetupIds ?? visibleSetups.map((setup) => setup.id))
 
   const showLatestCandles = () => {
     const chart = chartRef.current
@@ -150,7 +156,6 @@ export function CandleChart({ candles, analysis, tradeSetups = [], setupQualific
     overlaySeriesRef.current.forEach((series) => chart.removeSeries(series))
     overlaySeriesRef.current = []
 
-    const activeSetup = visibleSetup
     const latestTime = candles.at(-1)?.time ?? 0
     const oneHourAgo = latestTime - 60 * 60
     const recentSwings = analysis.swings.slice(-8)
@@ -176,8 +181,8 @@ export function CandleChart({ candles, analysis, tradeSetups = [], setupQualific
 
     const recentGaps = analysis.fairValueGaps.filter((gap) => gap.choch.time >= oneHourAgo).slice(-3)
     const displayedGaps = [...new Map(
-      [...recentGaps, ...(activeSetup ? [activeSetup] : [])].map((gap) => [gap.id, gap]),
-    ).values()].slice(-3)
+      [...recentGaps, ...visibleSetups].map((gap) => [gap.id, gap]),
+    ).values()]
     displayedGaps.forEach((gap) => {
       const zoneColor = gap.direction === 'long' ? '38, 166, 154' : '239, 83, 80'
       const zone = chart.addSeries(BaselineSeries, {
@@ -200,7 +205,8 @@ export function CandleChart({ candles, analysis, tradeSetups = [], setupQualific
       overlaySeriesRef.current.push(zone)
     })
 
-    if (activeSetup) {
+    visibleSetups.forEach((activeSetup) => {
+      const setupLabel = setupTimeLabel(activeSetup.choch.time)
       const bandStart = (activeSetup.entryTime ?? activeSetup.startTime) as Time
       const bandEnd = activeSetup.endTime as Time
       const rewardBand = chart.addSeries(BaselineSeries, {
@@ -244,9 +250,9 @@ export function CandleChart({ candles, analysis, tradeSetups = [], setupQualific
       overlaySeriesRef.current.push(riskBand)
 
       const levels = [
-        { price: activeSetup.midpoint, title: 'ENTRY', color: '#dfbb74', style: LineStyle.Solid },
-        { price: activeSetup.stopPrice, title: 'STOP · −1R', color: '#ff5c6c', style: LineStyle.Solid },
-        { price: activeSetup.targetPrice, title: 'TARGET · +4R', color: '#39d98a', style: LineStyle.Solid },
+        { price: activeSetup.midpoint, title: `${setupLabel} ENTRY`, color: '#dfbb74', style: LineStyle.Solid },
+        { price: activeSetup.stopPrice, title: `${setupLabel} STOP · −1R`, color: '#ff5c6c', style: LineStyle.Solid },
+        { price: activeSetup.targetPrice, title: `${setupLabel} TARGET · +4R`, color: '#39d98a', style: LineStyle.Solid },
       ]
       const levelHost = chart.addSeries(LineSeries, {
         color: 'rgba(0, 0, 0, 0)',
@@ -268,11 +274,11 @@ export function CandleChart({ candles, analysis, tradeSetups = [], setupQualific
           title: level.title,
         })
       })
-    }
+    })
 
     const recentChoch = analysis.chochEvents.filter((event) => event.time >= oneHourAgo)
     const displayedChoch = [...new Map(
-      [...recentChoch, ...(activeSetup ? [activeSetup.choch] : [])].map((event) => [`${event.direction}-${event.time}`, event]),
+      [...recentChoch, ...visibleSetups.map((setup) => setup.choch)].map((event) => [`${event.direction}-${event.time}`, event]),
     ).values()]
     displayedChoch.forEach((event) => {
       const breakLine = chart.addSeries(LineSeries, {
@@ -290,23 +296,31 @@ export function CandleChart({ candles, analysis, tradeSetups = [], setupQualific
       ])
       overlaySeriesRef.current.push(breakLine)
     })
-    markerPluginRef.current?.setMarkers(displayedChoch.map((event) => ({
+    const chochMarkers = displayedChoch.map((event) => ({
       time: event.time as Time,
       position: event.direction === 'long' ? 'belowBar' as const : 'aboveBar' as const,
       shape: event.direction === 'long' ? 'arrowUp' as const : 'arrowDown' as const,
       color: '#ff9800',
       text: 'CHoCH',
-    })))
-  }, [analysis, tradeSetups, visibleSetup])
+    }))
+    const setupMarkers = visibleSetups.map((setup) => ({
+      time: (setup.entryTime ?? setup.choch.time) as Time,
+      position: setup.direction === 'long' ? 'belowBar' as const : 'aboveBar' as const,
+      shape: 'square' as const,
+      color: alignedSetupIdSet.has(setup.id) ? '#39d98a' : '#dfbb74',
+      text: `${setupTimeLabel(setup.choch.time)} ${setup.direction.toUpperCase()} · ${setup.status === 'filled' ? 'ACTIVE' : 'WAITING'}`,
+    }))
+    markerPluginRef.current?.setMarkers([...chochMarkers, ...setupMarkers].sort((a, b) => Number(a.time) - Number(b.time)))
+  }, [analysis, tradeSetups, alignedSetupIds])
 
   return (
     <div className="chart-wrap">
       <div className="chart-auto-label"><i />Automated strategy view</div>
       <div className="chart-navigation">
         <span>Wheel: zoom · Drag: move · Drag axes: scale · Double-click axes: reset</span>
-        {visibleSetup && (
-          <b className={`chart-setup-state ${setupQualification}`}>
-            {setupQualification === 'aligned' ? 'Aligned trade' : 'Possible trade'} · {visibleSetup.status === 'filled' ? 'active' : 'waiting'}
+        {visibleSetups.length > 0 && (
+          <b className="chart-setup-state aligned">
+            {visibleSetups.filter((setup) => setup.status === 'filled').length} active · {visibleSetups.filter((setup) => setup.status === 'open').length} waiting
           </b>
         )}
         {!isFollowingLatest && <button type="button" onClick={showLatestCandles}>Latest candles</button>}
