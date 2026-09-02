@@ -21,6 +21,8 @@ interface CandleChartProps {
   analysis?: StructureAnalysis
   tradeSetups?: FairValueGap[]
   alignedSetupIds?: string[]
+  showResolvedSetups?: boolean
+  focusTime?: number
 }
 
 const chartCandle = (candle: Candle): CandlestickData<Time> => ({
@@ -36,16 +38,26 @@ const setupTimeLabel = (time: number) => new Date(time * 1000).toLocaleTimeStrin
   minute: '2-digit',
 })
 
-export function CandleChart({ candles, analysis, tradeSetups = [], alignedSetupIds }: CandleChartProps) {
+export function CandleChart({
+  candles,
+  analysis,
+  tradeSetups = [],
+  alignedSetupIds,
+  showResolvedSetups = false,
+  focusTime,
+}: CandleChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
   const overlaySeriesRef = useRef<Array<ISeriesApi<'Line'> | ISeriesApi<'Baseline'>>>([])
   const markerPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
+  const firstSeriesTimeRef = useRef<number | null>(null)
   const lastSeriesTimeRef = useRef<number | null>(null)
   const followLatestRef = useRef(true)
   const [isFollowingLatest, setIsFollowingLatest] = useState(true)
-  const visibleSetups = tradeSetups.filter((setup) => setup.status === 'open' || setup.status === 'filled')
+  const visibleSetups = showResolvedSetups
+    ? tradeSetups
+    : tradeSetups.filter((setup) => setup.status === 'open' || setup.status === 'filled')
   const alignedSetupIdSet = new Set(alignedSetupIds ?? visibleSetups.map((setup) => setup.id))
 
   const showLatestCandles = () => {
@@ -127,6 +139,7 @@ export function CandleChart({ candles, analysis, tradeSetups = [], alignedSetupI
       seriesRef.current = null
       markerPluginRef.current = null
       overlaySeriesRef.current = []
+      firstSeriesTimeRef.current = null
       lastSeriesTimeRef.current = null
       followLatestRef.current = true
     }
@@ -135,20 +148,30 @@ export function CandleChart({ candles, analysis, tradeSetups = [], alignedSetupI
   useEffect(() => {
     if (!seriesRef.current || candles.length === 0) return
     const latestCandle = candles.at(-1)!
+    const earliestCandle = candles[0]
+    const firstSeriesTime = firstSeriesTimeRef.current
     const lastSeriesTime = lastSeriesTimeRef.current
     const lastSeriesIndex = lastSeriesTime === null
       ? -1
       : candles.findIndex((candle) => candle.time === lastSeriesTime)
 
-    if (lastSeriesTime === null || lastSeriesIndex === -1 || latestCandle.time < lastSeriesTime) {
+    if (firstSeriesTime === null || earliestCandle.time < firstSeriesTime
+      || lastSeriesTime === null || lastSeriesIndex === -1 || latestCandle.time < lastSeriesTime) {
       seriesRef.current.setData(candles.map(chartCandle))
-      chartRef.current?.timeScale().setVisibleLogicalRange({ from: Math.max(0, candles.length - 140), to: candles.length + 4 })
+      const focusIndex = focusTime === undefined
+        ? candles.length - 1
+        : Math.max(0, candles.findIndex((candle) => candle.time >= focusTime))
+      chartRef.current?.timeScale().setVisibleLogicalRange({
+        from: Math.max(0, focusIndex - 70),
+        to: Math.min(candles.length + 4, focusIndex + 70),
+      })
     } else {
       candles.slice(lastSeriesIndex).forEach((candle) => seriesRef.current?.update(chartCandle(candle)))
       if (followLatestRef.current) chartRef.current?.timeScale().scrollToRealTime()
     }
+    firstSeriesTimeRef.current = earliestCandle.time
     lastSeriesTimeRef.current = latestCandle.time
-  }, [candles])
+  }, [candles, focusTime])
 
   useEffect(() => {
     const chart = chartRef.current
@@ -198,9 +221,10 @@ export function CandleChart({ candles, analysis, tradeSetups = [], alignedSetupI
         lastValueVisible: false,
         priceLineVisible: false,
       })
+      const zoneEnd = (showResolvedSetups && gap.exitTime ? gap.exitTime : gap.endTime) as Time
       zone.setData([
         { time: gap.startTime as Time, value: gap.top },
-        { time: gap.endTime as Time, value: gap.top },
+        { time: zoneEnd, value: gap.top },
       ])
       overlaySeriesRef.current.push(zone)
     })
@@ -208,7 +232,7 @@ export function CandleChart({ candles, analysis, tradeSetups = [], alignedSetupI
     visibleSetups.forEach((activeSetup) => {
       const setupLabel = setupTimeLabel(activeSetup.choch.time)
       const bandStart = (activeSetup.entryTime ?? activeSetup.startTime) as Time
-      const bandEnd = activeSetup.endTime as Time
+      const bandEnd = (showResolvedSetups && activeSetup.exitTime ? activeSetup.exitTime : activeSetup.endTime) as Time
       const rewardBand = chart.addSeries(BaselineSeries, {
         baseValue: { type: 'price', price: activeSetup.midpoint },
         relativeGradient: true,
@@ -308,21 +332,22 @@ export function CandleChart({ candles, analysis, tradeSetups = [], alignedSetupI
       position: setup.direction === 'long' ? 'belowBar' as const : 'aboveBar' as const,
       shape: 'square' as const,
       color: alignedSetupIdSet.has(setup.id) ? '#39d98a' : '#dfbb74',
-      text: `${setupTimeLabel(setup.choch.time)} ${setup.direction.toUpperCase()} · ${setup.status === 'filled' ? 'ACTIVE' : 'WAITING'}`,
+      text: `${setupTimeLabel(setup.choch.time)} ${setup.direction.toUpperCase()} · ${setup.status === 'filled' ? 'ACTIVE' : setup.status.toUpperCase()}`,
     }))
     markerPluginRef.current?.setMarkers([...chochMarkers, ...setupMarkers].sort((a, b) => Number(a.time) - Number(b.time)))
-  }, [analysis, tradeSetups, alignedSetupIds])
+  }, [analysis, tradeSetups, alignedSetupIds, showResolvedSetups])
 
   return (
     <div className="chart-wrap">
       <div className="chart-auto-label"><i />Automated strategy view</div>
       <div className="chart-navigation">
         <span>Wheel: zoom · Drag: move · Drag axes: scale · Double-click axes: reset</span>
-        {visibleSetups.length > 0 && (
+        {visibleSetups.length > 0 && !showResolvedSetups && (
           <b className="chart-setup-state aligned">
             {visibleSetups.filter((setup) => setup.status === 'filled').length} active · {visibleSetups.filter((setup) => setup.status === 'open').length} waiting
           </b>
         )}
+        {visibleSetups.length > 0 && showResolvedSetups && <b className="chart-setup-state aligned">Selected backtest trade</b>}
         {!isFollowingLatest && <button type="button" onClick={showLatestCandles}>Latest candles</button>}
       </div>
       <div className="chart-canvas" ref={containerRef} />

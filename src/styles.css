@@ -240,7 +240,12 @@ footer small { margin-left: auto; font: 400 8px 'DM Mono', monospace; text-trans
 .backtest-metrics small { color: #626a78; font: 400 8px 'DM Mono', monospace; text-transform: uppercase; }
 .backtest-chart { overflow: hidden; }
 .backtest-chart .chart-canvas { height: 510px; }
+.selected-trade-levels { display: flex; justify-content: flex-end; gap: 18px; padding: 9px 18px; border-top: 1px solid var(--line); background: #11151c; color: var(--muted); font: 400 8px 'DM Mono', monospace; text-transform: uppercase; }
+.selected-trade-levels b { color: #d9dde4; margin-left: 5px; }
 .backtest-row { grid-template-columns: .6fr 1.2fr 1.2fr 1fr .7fr; }
+.selectable-trade { cursor: pointer; outline: none; transition: background .15s ease, box-shadow .15s ease; }
+.selectable-trade:hover, .selectable-trade:focus-visible { background: rgba(223, 187, 116, .05); }
+.selectable-trade.selected { background: rgba(223, 187, 116, .08); box-shadow: inset 2px 0 var(--gold); }
 .no-trades { color: var(--muted); font-size: 11px; text-align: center; padding: 45px; }
 
 @media (max-width: 980px) {

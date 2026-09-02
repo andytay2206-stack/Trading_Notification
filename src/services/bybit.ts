@@ -52,6 +52,33 @@ export async function fetchCandles(interval: CandleInterval, signal?: AbortSigna
   })).reverse()
 }
 
+export async function fetchCandleRange(
+  interval: CandleInterval,
+  start: number,
+  end: number,
+  signal?: AbortSignal,
+): Promise<Candle[]> {
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start >= end) {
+    throw new Error('The historical start must be earlier than the end')
+  }
+
+  const candles = new Map<number, Candle>()
+  let cursor = end
+  while (cursor >= start) {
+    const page = await fetchCandles(interval, signal, { limit: 1000, end: cursor })
+    if (page.length === 0) break
+    page.forEach((item) => {
+      const timestamp = item.time * 1000
+      if (timestamp >= start && timestamp <= end) candles.set(item.time, item)
+    })
+    const oldest = page[0].time * 1000
+    if (oldest <= start || oldest >= cursor) break
+    cursor = oldest - 1
+  }
+
+  return [...candles.values()].sort((a, b) => a.time - b.time)
+}
+
 export function subscribeToCandles(
   interval: CandleInterval,
   onCandle: (candle: Candle) => void,

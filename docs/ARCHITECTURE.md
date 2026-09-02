@@ -32,7 +32,7 @@ Tables are created idempotently when the API starts. Later production deployment
 ## Backtesting flow
 
 ```text
-Random endpoint from previous 2 years
+User-selected historical start/end window (up to 7 days)
               ↓
 Bybit historical candles
               ↓
@@ -54,7 +54,7 @@ The chart is built with TradingView Lightweight Charts. Its strategy annotations
 - a red `−1R` stop;
 - a green `+4R` target.
 
-The one-at-a-time selected setup receives viewport-wide price levels and remains visible until it wins, loses, or is cancelled at 180 candles. Its time-stamped tag is placed above the setup candle for shorts and below it for longs. Resolved trade overlays and price lines are removed automatically. Translucent green and red bands visualize reward and risk respectively. The chart retains orange structural-swing CHoCH break lines, three recent softly shaded FVGs plus the selected gap, and compact labeled swing-high and swing-low trend lines.
+The one-at-a-time live setup receives viewport-wide price levels and remains visible until it wins, loses, or is cancelled at 180 candles. Its time-stamped tag is placed above the setup candle for shorts and below it for longs. Resolved live overlays are removed automatically; the backtest chart can deliberately restore one selected completed trade. Translucent green and red bands visualize reward and risk respectively. The chart retains orange structural-swing CHoCH break lines, three recent softly shaded FVGs plus the selected gap, and compact labeled swing-high and swing-low trend lines.
 
 Live updates modify only new candle data. Strategy overlays are rebuilt only when a candle closes, not for every update to the current candle. Rolling the 300-candle window no longer resets the visible range, and trade overlays are excluded from automatic price scaling so a distant 4R target cannot compress the candle view into an apparently blank chart.
 

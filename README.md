@@ -81,7 +81,7 @@ This executes unit tests for performance calculations and creates a production b
 
 ## Backtesting status
 
-The backtester uses the same structural strategy as the live scanner: timestamp-aligned 15-minute direction, 1-minute CHoCH, three-candle FVG midpoint entry, a stop 5% of the CHoCH candle range beyond its wick, and a 4R target. Each run selects a random endpoint between two days and two years ago. Fees, funding, slippage, and spread are not included.
+The backtester uses the same structural strategy as the live scanner: timestamp-aligned 15-minute direction, 1-minute CHoCH, dominant three-candle FVG midpoint entry, a stop 5% of the invalidation candle range beyond its body edge, and a 4R target. Choose a repeatable historical start/end window of up to seven days; the app loads 12 hours of warm-up structure automatically. Select any completed journal trade to inspect its entry, stop, and target on the chart. Fees, funding, slippage, and spread are not included.
 
 ## Development workflow
 

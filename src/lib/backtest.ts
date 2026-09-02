@@ -34,7 +34,13 @@ export interface BacktestResult {
   maxDrawdownR: number
 }
 
-export function runStructureBacktest(oneMinuteCandles: Candle[], fifteenMinuteCandles: Candle[], config: BacktestConfig): BacktestResult {
+export function runStructureBacktest(
+  oneMinuteCandles: Candle[],
+  fifteenMinuteCandles: Candle[],
+  config: BacktestConfig,
+  windowStart = Number.NEGATIVE_INFINITY,
+  windowEnd = Number.POSITIVE_INFINITY,
+): BacktestResult {
   const settings = {
     pivotLength: config.pivotLength,
     stopBufferPercent: config.stopBufferPercent,
@@ -44,6 +50,7 @@ export function runStructureBacktest(oneMinuteCandles: Candle[], fifteenMinuteCa
   const oneMinute = analyzeStructure(oneMinuteCandles, settings)
   const fifteenMinute = analyzeStructure(fifteenMinuteCandles, settings)
   const setups = oneSetupAtATime(alignedOneMinuteSetups(oneMinute, fifteenMinute))
+    .filter((setup) => setup.choch.time >= windowStart && setup.choch.time <= windowEnd)
   const trades: BacktestTrade[] = setups
     .filter((setup) => setup.entryTime && setup.exitTime
       && (setup.status === 'won' || setup.status === 'lost' || setup.status === 'cancelled'))
@@ -87,10 +94,4 @@ export function runStructureBacktest(oneMinuteCandles: Candle[], fifteenMinuteCa
     cancellations,
     maxDrawdownR,
   }
-}
-
-export function randomHistoricalEnd(now = Date.now(), random = Math.random) {
-  const minimumAge = 2 * 24 * 60 * 60 * 1_000
-  const historyRange = 730 * 24 * 60 * 60 * 1_000
-  return Math.floor(now - minimumAge - random() * historyRange)
 }

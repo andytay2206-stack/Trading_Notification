@@ -24,22 +24,23 @@ The two-candle confirmation means a pivot is known only after two later candles 
 ## Change of Character (CHoCH)
 
 - Swing structure first establishes whether the move is upward or downward.
-- During a downward structural leg, a new candle closing above the preceding confirmed swing high creates bullish CHoCH.
-- During an upward structural leg, a new candle closing below the preceding confirmed swing low creates bearish CHoCH.
+- During a downward structural leg, a new candle closing above the body edge of the preceding confirmed swing high creates bullish CHoCH.
+- During an upward structural leg, a new candle closing below the body edge of the preceding confirmed swing low creates bearish CHoCH.
 - The opposite swing formed after the broken level is the setup's invalidation extreme. For example, after a swing low at 01:17 and a new swing high at 01:25, the 01:27 close below the 01:17 low is bearish CHoCH and the 01:25 high is the invalidation extreme.
-- A wick through the structural swing without a close beyond it does not qualify.
+- Pivots are still found from candle wicks, but the break level is the swing candle's body edge. A wick through that level without a close beyond it does not qualify.
 
 ## Fair Value Gap (FVG)
 
-The CHoCH candle must also be the middle displacement candle of a three-candle pattern. CHoCH without FVG does not create an entry:
+The structural leg from the invalidation swing through the CHoCH must contain a three-candle imbalance. CHoCH without an FVG in that move does not create an entry:
 
 - Bullish FVG: the following candle's low is above the preceding candle's high.
 - Bearish FVG: the following candle's high is below the preceding candle's low.
+- If the leg contains multiple FVGs, the widest gap is selected as the dominant displacement zone.
 - Entry is the 50% midpoint between the two FVG boundaries.
 - A selected setup has a total lifetime of 180 one-minute candles from its CHoCH candle.
 - No newer setup is considered while the selected setup is waiting, filled, or active.
 
-In the documented live example, 01:27 is the middle CHoCH/displacement candle; 01:26 and 01:28 provide the two non-overlapping wick boundaries.
+In the 03:34 short example, the chosen FVG is 03:29/03:30/03:31. The non-overlapping boundaries are 77,613.9 and 77,563.5, giving a midpoint entry of 77,588.7. The pullback fills at 03:39 and the buffered stop is 77,713.7. The earlier 01:27 example remains valid when the CHoCH candle itself is the middle displacement candle.
 
 This is the current precise interpretation of the requested gap inside the CHoCH move. It can be adjusted if a different wick/body definition is intended.
 
@@ -70,7 +71,7 @@ The scanner tracks the selected setup virtually. When it resolves:
 
 ## Chart display policy
 
-The single selected setup retains its entry, stop, target, and risk/reward shading while waiting or active. Won, lost, and cancelled trade levels are removed immediately. Entry, stop, and target use viewport-wide price lines so they remain visible while navigating left or right. The reward area is translucent green from entry to target; the risk area is translucent red from entry to stop.
+The single selected live setup retains its entry, stop, target, and risk/reward shading while waiting or active. Won, lost, and cancelled live levels are removed immediately. In backtesting, selecting a completed journal row restores that trade's entry, stop, target, and shading for review. Entry, stop, and target use viewport-wide price lines so they remain visible while navigating left or right. The reward area is translucent green from entry to target; the risk area is translucent red from entry to stop.
 
 The setup receives a time-stamped candle tag. A short tag sits above its entry or CHoCH candle; a long tag sits below it.
 
@@ -83,4 +84,5 @@ The automated indicators do not prevent chart navigation. Use the mouse wheel to
 - Fees, funding, spread, and slippage are excluded.
 - The scanner currently runs when the dashboard requests a scan; an always-on background worker is still planned.
 - A maximum of 1,000 one-minute candles is evaluated per scan due to the upstream endpoint limit.
+- Backtests accept a fixed historical start/end window of up to seven days and load a 12-hour warm-up before it. This makes runs repeatable while giving the structure engine prior context.
 - Strategy behavior should be reviewed visually against known examples before being treated as production trading guidance.
