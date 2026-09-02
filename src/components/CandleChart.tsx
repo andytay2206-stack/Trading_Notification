@@ -108,7 +108,9 @@ export function CandleChart({ candles, analysis, tradeSetups = [] }: CandleChart
     overlaySeriesRef.current = []
 
     const activeSetup = tradeSetups.filter((setup) => setup.status === 'open' || setup.status === 'filled').at(-1)
-    const recentSwings = analysis.swings.slice(-6)
+    const latestTime = candles.at(-1)?.time ?? 0
+    const oneHourAgo = latestTime - 60 * 60
+    const recentSwings = analysis.swings.slice(-8)
     ;(['high', 'low'] as const).forEach((type) => {
       const points = recentSwings.filter((swing) => swing.type === type)
       for (let index = 1; index < points.length; index += 1) {
@@ -119,6 +121,7 @@ export function CandleChart({ candles, analysis, tradeSetups = [] }: CandleChart
           lastValueVisible: false,
           priceLineVisible: false,
           crosshairMarkerVisible: false,
+          title: index === points.length - 1 ? (type === 'high' ? 'Swing-high trend' : 'Swing-low trend') : '',
         })
         line.setData([
           { time: points[index - 1].time as Time, value: points[index - 1].price },
@@ -128,10 +131,31 @@ export function CandleChart({ candles, analysis, tradeSetups = [] }: CandleChart
       }
     })
 
-    const displayedGaps = activeSetup
-      ? [activeSetup]
-      : analysis.fairValueGaps.filter((gap) => gap.status === 'open' || gap.status === 'filled').slice(-1)
+    const recentGaps = analysis.fairValueGaps.filter((gap) => gap.choch.time >= oneHourAgo).slice(-3)
+    const displayedGaps = [...new Map(
+      [...recentGaps, ...(activeSetup ? [activeSetup] : [])].map((gap) => [gap.id, gap]),
+    ).values()].slice(-3)
     displayedGaps.forEach((gap) => {
+      const zoneColor = gap.direction === 'long' ? '57, 217, 138' : '255, 92, 108'
+      const zone = chart.addSeries(BaselineSeries, {
+        baseValue: { type: 'price', price: gap.bottom },
+        relativeGradient: true,
+        topFillColor1: `rgba(${zoneColor}, .12)`,
+        topFillColor2: `rgba(${zoneColor}, .04)`,
+        topLineColor: `rgba(${zoneColor}, 0)`,
+        bottomFillColor1: `rgba(${zoneColor}, .04)`,
+        bottomFillColor2: `rgba(${zoneColor}, .12)`,
+        bottomLineColor: `rgba(${zoneColor}, 0)`,
+        lineWidth: 1,
+        lastValueVisible: false,
+        priceLineVisible: false,
+      })
+      zone.setData([
+        { time: gap.startTime as Time, value: gap.top },
+        { time: gap.endTime as Time, value: gap.top },
+      ])
+      overlaySeriesRef.current.push(zone)
+
       ;[gap.top, gap.bottom].forEach((price, boundaryIndex) => {
         const line = chart.addSeries(LineSeries, {
           color: gap.direction === 'long' ? 'rgba(57, 217, 138, .7)' : 'rgba(255, 92, 108, .7)',
@@ -214,7 +238,10 @@ export function CandleChart({ candles, analysis, tradeSetups = [] }: CandleChart
       })
     }
 
-    const displayedChoch = activeSetup ? [activeSetup.choch] : analysis.chochEvents.slice(-2)
+    const recentChoch = analysis.chochEvents.filter((event) => event.time >= oneHourAgo)
+    const displayedChoch = [...new Map(
+      [...recentChoch, ...(activeSetup ? [activeSetup.choch] : [])].map((event) => [`${event.direction}-${event.time}`, event]),
+    ).values()]
     markerPluginRef.current?.setMarkers(displayedChoch.map((event) => ({
       time: event.time as Time,
       position: event.direction === 'long' ? 'belowBar' as const : 'aboveBar' as const,

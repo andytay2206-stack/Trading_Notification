@@ -53,7 +53,7 @@ The chart is an output display rather than a manual analysis tool. Mouse/touch s
 - a red `−1R` stop;
 - a green `+4R` target.
 
-Only the newest waiting/active setup receives trade levels. Resolved trade overlays are removed automatically. Translucent green and red bands visualize reward and risk respectively.
+Only the newest waiting/active setup receives trade levels. Resolved trade overlays are removed automatically. Translucent green and red bands visualize reward and risk respectively. The chart retains CHoCH markers and up to three shaded FVGs from the latest hour, plus compact labeled swing-high and swing-low trend lines.
 
 The chart, server scanner, notification outcomes, and backtester all consume the same strategy implementation.
 

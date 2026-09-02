@@ -60,7 +60,9 @@ The scanner tracks every valid setup virtually. When it resolves:
 
 ## Chart display policy
 
-To keep the automated chart readable, only the newest setup whose FVG is waiting for entry or whose virtual trade is active receives entry, stop, target, and risk/reward shading. Resolved and expired trade levels are removed. The reward area is translucent green from entry to target; the risk area is translucent red from entry to stop. Only a small recent set of swing segments and CHoCH context remains visible.
+To keep the automated chart readable, only the newest setup whose FVG is waiting for entry or whose virtual trade is active receives entry, stop, target, and risk/reward shading. Resolved and expired trade levels are removed. The reward area is translucent green from entry to target; the risk area is translucent red from entry to stop.
+
+CHoCH markers and up to three direction-colored FVG zones remain visible for the latest one-hour window. Compact labeled trend lines connect the latest swing highs and swing lows. An active setup remains visible even if its originating CHoCH has just moved outside that one-hour context window.
 
 ## Known limitations
 
