@@ -10,7 +10,7 @@ Bybit public APIs ← bybit-api SDK ← Node API ← authenticated React client
                                  PostgreSQL
 ```
 
-The Node API loads the latest 300 `BTCUSDT` linear perpetual candles using `RestClientV5`. `WebsocketClient` subscribes to Bybit klines and bridges updates to the browser through server-sent events. A 10-second REST poll provides a fallback when WebSocket access is restricted.
+The Node API loads the latest 300 `BTCUSDT` linear perpetual candles using `RestClientV5`. `WebsocketClient` subscribes to Bybit klines and bridges updates to the browser through server-sent events. A sequential 10-second REST poll provides a fallback when WebSocket access is restricted. Interval changes cancel and deactivate the prior feed before its callbacks can update the new view, preventing stale 15-minute responses from contaminating the 1-minute chart. The selected interval is persisted in browser storage so a remount does not silently return to 15 minutes.
 
 ## Authentication
 
@@ -48,12 +48,14 @@ The chart is built with TradingView Lightweight Charts. Its strategy annotations
 
 - dotted swing-structure trend segments;
 - CHoCH arrows at closed-candle breaks;
-- dashed upper/lower FVG boundaries;
+- softly shaded FVG zones;
 - a gold midpoint entry;
 - a red `−1R` stop;
 - a green `+4R` target.
 
 Only the newest waiting/active setup receives viewport-wide price levels. A counter-bias setup is visibly labeled **Possible trade**; a setup matching the timestamp-aligned 15-minute direction is labeled **Aligned trade** and can enter notification tracking. Resolved trade overlays and price lines are removed automatically. Translucent green and red bands visualize reward and risk respectively. The chart retains orange structural-swing CHoCH break lines and up to three softly shaded FVGs from the latest hour, plus compact labeled swing-high and swing-low trend lines.
+
+Live updates modify only new candle data. Strategy overlays are rebuilt only when a candle closes, not for every update to the current candle. Rolling the 300-candle window no longer resets the visible range, and trade overlays are excluded from automatic price scaling so a distant 4R target cannot compress the candle view into an apparently blank chart.
 
 Pending signals carry a strategy version. `structure-v3` identifies the confirmed-structural-swing CHoCH rule; unresolved signals from older definitions are excluded from the current noticeboard, while user-decided history remains preserved.
 

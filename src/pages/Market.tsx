@@ -9,6 +9,17 @@ const intervals: Array<{ value: CandleInterval; label: string }> = [
   { value: '15', label: '15m' }, { value: '30', label: '30m' }, { value: '60', label: '1H' },
   { value: '240', label: '4H' }, { value: 'D', label: '1D' },
 ]
+const MARKET_INTERVAL_KEY = 'northstar.market.interval'
+
+const initialInterval = (): CandleInterval => {
+  try {
+    const saved = window.localStorage.getItem(MARKET_INTERVAL_KEY)
+    if (intervals.some((item) => item.value === saved)) return saved as CandleInterval
+  } catch {
+    // Storage can be unavailable in private or restricted browser contexts.
+  }
+  return '15'
+}
 
 type ConnectionStatus = 'connecting' | 'live' | 'polling' | 'offline'
 
@@ -19,7 +30,7 @@ const mergeCandles = (current: Candle[], incoming: Candle[]) => {
 }
 
 export function Market() {
-  const [interval, setInterval] = useState<CandleInterval>('15')
+  const [interval, setInterval] = useState<CandleInterval>(initialInterval)
   const [candles, setCandles] = useState<Candle[]>([])
   const [status, setStatus] = useState<ConnectionStatus>('connecting')
   const [error, setError] = useState<string | null>(null)
@@ -29,27 +40,34 @@ export function Market() {
 
   useEffect(() => {
     const controller = new AbortController()
+    let active = true
+    let pollTimer: number | undefined
     setCandles([])
     setError(null)
     setStatus('connecting')
 
     const refresh = (initial = false) => fetchCandles(interval, controller.signal, { limit: initial ? 300 : 3 })
       .then((incoming) => {
+        if (!active) return
         setCandles((current) => initial ? incoming : mergeCandles(current, incoming))
         setError(null)
         setLastUpdated(new Date())
         setStatus((current) => current === 'live' ? 'live' : 'polling')
       })
       .catch((cause: unknown) => {
-        if (cause instanceof DOMException && cause.name === 'AbortError') return
+        if (!active || (cause instanceof DOMException && cause.name === 'AbortError')) return
         setError(cause instanceof Error ? cause.message : 'Could not load Bybit candles')
         setStatus('offline')
       })
 
-    void refresh(true)
-    const pollTimer = window.setInterval(() => void refresh(), 10_000)
+    const schedulePoll = () => {
+      if (!active) return
+      pollTimer = window.setTimeout(() => void refresh().finally(schedulePoll), 10_000)
+    }
+    void refresh(true).finally(schedulePoll)
 
     const unsubscribe = subscribeToCandles(interval, (incoming) => {
+      if (!active) return
       setCandles((current) => {
         const last = current.at(-1)
         if (!last || incoming.time > last.time) return [...current, incoming].slice(-300)
@@ -58,13 +76,15 @@ export function Market() {
       })
       setLastUpdated(new Date())
     }, (socketStatus) => {
+      if (!active) return
       if (socketStatus === 'live') setStatus('live')
       if (socketStatus === 'connecting') setStatus('connecting')
     })
 
     return () => {
+      active = false
       controller.abort()
-      window.clearInterval(pollTimer)
+      if (pollTimer !== undefined) window.clearTimeout(pollTimer)
       unsubscribe()
     }
   }, [interval, reloadKey])
@@ -83,7 +103,11 @@ export function Market() {
   const latest = candles.at(-1)
   const previous = candles.at(-2)
   const change = useMemo(() => latest && previous ? ((latest.close - previous.close) / previous.close) * 100 : 0, [latest, previous])
-  const analysis = useMemo(() => analyzeStructure(candles.filter((candle) => candle.confirmed)), [candles])
+  const confirmedCandles = useMemo(() => candles.filter((candle) => candle.confirmed), [candles])
+  const confirmedSignature = confirmedCandles
+    .map((candle) => `${candle.time}:${candle.open}:${candle.high}:${candle.low}:${candle.close}`)
+    .join('|')
+  const analysis = useMemo(() => analyzeStructure(confirmedCandles), [confirmedSignature])
   const fifteenMinuteAnalysis = useMemo(() => analyzeStructure(fifteenMinuteCandles.filter((candle) => candle.confirmed)), [fifteenMinuteCandles])
   const alignedSetups = useMemo(() => interval === '1' ? alignedOneMinuteSetups(analysis, fifteenMinuteAnalysis) : [], [analysis, fifteenMinuteAnalysis, interval])
   const chartSetups = useMemo(
@@ -93,6 +117,17 @@ export function Market() {
   const chartSetupQualification = chartSetups[0] && alignedSetups.some((setup) => setup.id === chartSetups[0].id)
     ? 'aligned' as const
     : 'candidate' as const
+
+  const selectInterval = (nextInterval: CandleInterval) => {
+    if (nextInterval === interval) return
+    setCandles([])
+    setInterval(nextInterval)
+    try {
+      window.localStorage.setItem(MARKET_INTERVAL_KEY, nextInterval)
+    } catch {
+      // The in-memory selection still works when storage is unavailable.
+    }
+  }
 
   return (
     <main>
@@ -124,7 +159,7 @@ export function Market() {
             </div>
           </div>
           <div className="interval-bar">
-            {intervals.map((item) => <button type="button" className={interval === item.value ? 'active' : ''} key={item.value} onClick={() => setInterval(item.value)}>{item.label}</button>)}
+            {intervals.map((item) => <button type="button" className={interval === item.value ? 'active' : ''} key={item.value} onClick={() => selectInterval(item.value)}>{item.label}</button>)}
             <span className="last-update">{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : 'Waiting for data'}</span>
           </div>
           <div className="indicator-legend">
@@ -135,7 +170,7 @@ export function Market() {
           </div>
           {error && candles.length === 0
             ? <div className="chart-error"><b>Market data unavailable</b><span>{error}. Check the connection and retry.</span><button type="button" className="secondary-button" onClick={() => setReloadKey((key) => key + 1)}>Retry feed</button></div>
-            : candles.length ? <CandleChart candles={candles} analysis={analysis} tradeSetups={chartSetups} setupQualification={chartSetupQualification} /> : <div className="chart-loading"><i /><span>Loading Bybit candles…</span></div>}
+            : candles.length ? <CandleChart key={interval} candles={candles} analysis={analysis} tradeSetups={chartSetups} setupQualification={chartSetupQualification} /> : <div className="chart-loading"><i /><span>Loading Bybit candles…</span></div>}
         </div>
 
         <aside className="trade-rail">

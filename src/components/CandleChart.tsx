@@ -9,7 +9,6 @@ import {
   LineStyle,
   type CandlestickData,
   type IChartApi,
-  type IPriceLine,
   type ISeriesApi,
   type ISeriesMarkersPluginApi,
   type Time,
@@ -37,9 +36,8 @@ export function CandleChart({ candles, analysis, tradeSetups = [], setupQualific
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
   const overlaySeriesRef = useRef<Array<ISeriesApi<'Line'> | ISeriesApi<'Baseline'>>>([])
-  const tradePriceLinesRef = useRef<IPriceLine[]>([])
   const markerPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
-  const firstTimeRef = useRef<number | null>(null)
+  const lastSeriesTimeRef = useRef<number | null>(null)
   const followLatestRef = useRef(true)
   const [isFollowingLatest, setIsFollowingLatest] = useState(true)
   const visibleSetup = tradeSetups.filter((setup) => setup.status === 'open' || setup.status === 'filled').at(-1)
@@ -123,23 +121,27 @@ export function CandleChart({ candles, analysis, tradeSetups = [], setupQualific
       seriesRef.current = null
       markerPluginRef.current = null
       overlaySeriesRef.current = []
-      tradePriceLinesRef.current = []
-      firstTimeRef.current = null
+      lastSeriesTimeRef.current = null
       followLatestRef.current = true
     }
   }, [])
 
   useEffect(() => {
     if (!seriesRef.current || candles.length === 0) return
-    const firstTime = candles[0].time
-    if (firstTimeRef.current !== firstTime) {
+    const latestCandle = candles.at(-1)!
+    const lastSeriesTime = lastSeriesTimeRef.current
+    const lastSeriesIndex = lastSeriesTime === null
+      ? -1
+      : candles.findIndex((candle) => candle.time === lastSeriesTime)
+
+    if (lastSeriesTime === null || lastSeriesIndex === -1 || latestCandle.time < lastSeriesTime) {
       seriesRef.current.setData(candles.map(chartCandle))
       chartRef.current?.timeScale().setVisibleLogicalRange({ from: Math.max(0, candles.length - 140), to: candles.length + 4 })
-      firstTimeRef.current = firstTime
     } else {
-      seriesRef.current.update(chartCandle(candles.at(-1)!))
+      candles.slice(lastSeriesIndex).forEach((candle) => seriesRef.current?.update(chartCandle(candle)))
       if (followLatestRef.current) chartRef.current?.timeScale().scrollToRealTime()
     }
+    lastSeriesTimeRef.current = latestCandle.time
   }, [candles])
 
   useEffect(() => {
@@ -147,10 +149,6 @@ export function CandleChart({ candles, analysis, tradeSetups = [], setupQualific
     if (!chart || !analysis) return
     overlaySeriesRef.current.forEach((series) => chart.removeSeries(series))
     overlaySeriesRef.current = []
-    if (seriesRef.current) {
-      tradePriceLinesRef.current.forEach((line) => seriesRef.current?.removePriceLine(line))
-    }
-    tradePriceLinesRef.current = []
 
     const activeSetup = visibleSetup
     const latestTime = candles.at(-1)?.time ?? 0
@@ -217,6 +215,7 @@ export function CandleChart({ candles, analysis, tradeSetups = [], setupQualific
         lineWidth: 1,
         lastValueVisible: false,
         priceLineVisible: false,
+        autoscaleInfoProvider: () => null,
       })
       rewardBand.setData([
         { time: bandStart, value: activeSetup.targetPrice },
@@ -236,6 +235,7 @@ export function CandleChart({ candles, analysis, tradeSetups = [], setupQualific
         lineWidth: 1,
         lastValueVisible: false,
         priceLineVisible: false,
+        autoscaleInfoProvider: () => null,
       })
       riskBand.setData([
         { time: bandStart, value: activeSetup.stopPrice },
@@ -248,8 +248,17 @@ export function CandleChart({ candles, analysis, tradeSetups = [], setupQualific
         { price: activeSetup.stopPrice, title: 'STOP · −1R', color: '#ff5c6c', style: LineStyle.Solid },
         { price: activeSetup.targetPrice, title: 'TARGET · +4R', color: '#39d98a', style: LineStyle.Solid },
       ]
+      const levelHost = chart.addSeries(LineSeries, {
+        color: 'rgba(0, 0, 0, 0)',
+        lineVisible: false,
+        lastValueVisible: false,
+        priceLineVisible: false,
+        crosshairMarkerVisible: false,
+        autoscaleInfoProvider: () => null,
+      })
+      overlaySeriesRef.current.push(levelHost)
       levels.forEach((level) => {
-        const line = seriesRef.current?.createPriceLine({
+        levelHost.createPriceLine({
           price: level.price,
           color: level.color,
           lineWidth: 2,
@@ -258,7 +267,6 @@ export function CandleChart({ candles, analysis, tradeSetups = [], setupQualific
           axisLabelVisible: true,
           title: level.title,
         })
-        if (line) tradePriceLinesRef.current.push(line)
       })
     }
 

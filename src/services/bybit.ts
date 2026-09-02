@@ -65,18 +65,24 @@ export function subscribeToCandles(
   })
 
   stream.addEventListener('message', (event) => {
-    const items = JSON.parse(event.data) as BybitStreamCandle[]
-    const item = items[0]
-    if (!item) return
-    onCandle({
-      time: item.start / 1000,
-      open: Number(item.open),
-      high: Number(item.high),
-      low: Number(item.low),
-      close: Number(item.close),
-      volume: Number(item.volume),
-      confirmed: item.confirm,
-    })
+    try {
+      const items = JSON.parse(event.data) as BybitStreamCandle[]
+      const item = Array.isArray(items) ? items[0] : undefined
+      if (!item) return
+      const candle = {
+        time: Number(item.start) / 1000,
+        open: Number(item.open),
+        high: Number(item.high),
+        low: Number(item.low),
+        close: Number(item.close),
+        volume: Number(item.volume),
+        confirmed: Boolean(item.confirm),
+      }
+      if (![candle.time, candle.open, candle.high, candle.low, candle.close, candle.volume].every(Number.isFinite)) return
+      onCandle(candle)
+    } catch {
+      // Ignore a malformed stream event; the REST poll remains available as fallback.
+    }
   })
 
   stream.addEventListener('error', () => onStatus('offline'))
