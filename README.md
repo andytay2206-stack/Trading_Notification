@@ -81,7 +81,7 @@ This executes unit tests for performance calculations and creates a production b
 
 ## Backtesting status
 
-The backtester uses the same structural strategy as the live scanner: timestamp-aligned 15-minute direction, 1-minute CHoCH, the most relevant three-candle FVG midpoint entry, a stop near the opposite pre-CHoCH candle-body extreme with a 5% full-range buffer, and a 4R target. Each run randomly selects a historical endpoint between two days and two years ago and loads 500, 800, or 1,000 candles plus structural warm-up data. Select any completed journal trade to inspect its entry, stop, and target on the chart. Fees, funding, slippage, and spread are not included.
+The backtester uses the same structural strategy as the live scanner: timestamp-aligned 15-minute direction, 1-minute CHoCH, the most relevant established three-candle FVG midpoint entry, a stop near the latest opposing swing wick with a 5% full-range buffer, and a 4R target. Each run randomly selects a historical endpoint between two days and two years ago and loads 500, 800, or 1,000 candles plus structural warm-up data. Select any completed journal trade to inspect its entry, stop, and target on the chart. Fees, funding, slippage, and spread are not included.
 
 ## Development workflow
 

@@ -93,6 +93,7 @@ h2 { font: 600 20px Manrope, sans-serif; letter-spacing: -.025em; margin-bottom:
 .metric-value { color: #f3f5f8; font: 600 clamp(24px, 2.2vw, 34px) Manrope, sans-serif; letter-spacing: -.045em; margin-bottom: 8px; white-space: nowrap; }
 .positive { color: var(--green) !important; }
 .negative { color: var(--red) !important; }
+.warning { color: var(--gold) !important; }
 .metric-detail { color: var(--muted); font: 400 10px 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .06em; }
 
 .panel { background: var(--panel); border: 1px solid var(--line); }

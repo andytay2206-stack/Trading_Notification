@@ -124,11 +124,19 @@ export function Market() {
       : [],
     [analysis, fifteenMinuteAnalysis, interval, strategyStartedAt],
   )
+  const selectedSetups = useMemo(
+    () => interval === '1' && strategyStartedAt !== null
+      ? oneSetupAtATime(analysis.fairValueGaps
+        .filter((setup) => setup.choch.time >= strategyStartedAt))
+      : [],
+    [analysis, interval, strategyStartedAt],
+  )
   const chartSetups = useMemo(
-    () => alignedSetups.filter((setup) => setup.status === 'open' || setup.status === 'filled'),
-    [alignedSetups],
+    () => selectedSetups.filter((setup) => setup.status === 'open' || setup.status === 'filled'),
+    [selectedSetups],
   )
   const alignedSetupIds = useMemo(() => alignedSetups.map((setup) => setup.id), [alignedSetups])
+  const chartSetupIsAligned = chartSetups.some((setup) => alignedSetupIds.includes(setup.id))
 
   const selectInterval = (nextInterval: CandleInterval) => {
     if (nextInterval === interval) return
@@ -187,11 +195,12 @@ export function Market() {
 
         <aside className="trade-rail">
           <article className="panel signal-card">
-            <div className="signal-heading"><span className="radar-icon">⌁</span><span className="pill">Strategy pending</span></div>
+            <div className="signal-heading"><span className="radar-icon">⌁</span><span className="pill">{chartSetups.length ? (chartSetupIsAligned ? 'Aligned setup' : 'Possible setup') : 'Strategy pending'}</span></div>
             <div className="overline">Signal monitor</div>
             <h2>Watching the market</h2>
             <p>Tracking structural CHoCH and fair value gap pullbacks. A 1-minute setup is valid only when aligned with the 15-minute bias.</p>
             <div className="strategy-direction"><span>15m direction</span><b className={fifteenMinuteAnalysis.bias === 'long' ? 'positive' : fifteenMinuteAnalysis.bias === 'short' ? 'negative' : ''}>{fifteenMinuteAnalysis.bias}</b></div>
+            <div className="strategy-direction"><span>Selected 1m setup</span><b className={chartSetupIsAligned ? 'positive' : chartSetups.length ? 'warning' : ''}>{chartSetups.length ? (chartSetupIsAligned ? 'Aligned' : 'Possible') : 'None'}</b></div>
             <div className="strategy-direction"><span>Aligned 1m FVGs</span><b>{interval === '1' ? alignedSetups.length : 'Select 1m'}</b></div>
           </article>
 

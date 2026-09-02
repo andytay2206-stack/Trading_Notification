@@ -26,7 +26,7 @@ The two-candle confirmation means a pivot is known only after two later candles 
 - Swing structure first establishes whether the move is upward or downward.
 - During a downward structural leg, a new candle closing above the body edge of the preceding confirmed swing high creates bullish CHoCH.
 - During an upward structural leg, a new candle closing below the body edge of the preceding confirmed swing low creates bearish CHoCH.
-- After the break level is identified, the engine scans the move between that broken swing and the CHoCH. For a bearish CHoCH it uses the highest closed candle-body point; for a bullish CHoCH it uses the lowest closed candle-body point. This is the stop's invalidation extreme.
+- The latest confirmed opposing swing before CHoCH is the stop's invalidation extreme. Its wick supplies the lowest point for a bullish setup or highest point for a bearish setup.
 - Pivots are still found from candle wicks, but the break level is the swing candle's body edge. A wick through that level without a close beyond it does not qualify.
 
 ## Fair Value Gap (FVG)
@@ -35,19 +35,19 @@ The structural leg from the invalidation swing through the CHoCH must contain a 
 
 - Bullish FVG: the following candle's low is above the preceding candle's high.
 - Bearish FVG: the following candle's high is below the preceding candle's low.
-- If the leg contains multiple FVGs, the widest gap is treated as the most relevant displacement zone; a tie uses the gap nearest the CHoCH.
+- An FVG established at least one full closed candle before CHoCH is preferred. If several qualify, the widest gap is the most relevant displacement zone and a tie uses the nearest gap. If none was already established, a valid CHoCH-centered FVG may be used after its third candle closes.
 - Entry is the 50% midpoint between the two FVG boundaries.
 - A selected setup has a total lifetime of 180 one-minute candles from its CHoCH candle.
 - No newer setup is considered while the selected setup is waiting, filled, or active.
 
-In the 03:34 short example, the chosen FVG is 03:29/03:30/03:31. The non-overlapping boundaries are 77,613.9 and 77,563.5, giving a midpoint entry of 77,588.7. The pullback fills at 03:39 and the buffered stop is 77,713.7. The earlier 01:27 example remains valid when the CHoCH candle itself is the middle displacement candle.
+In the 06:39 long example, the preferred established FVG is 06:34/06:35/06:36. Its boundaries are 77,490.6 and 77,500.0, giving a midpoint entry of 77,495.3. The 06:34 invalidation wick is 77,408.3 and the buffered stop is 77,404.2. The earlier 01:27 example remains valid when no earlier established FVG exists and the CHoCH candle itself is the middle displacement candle.
 
 This is the current precise interpretation of the requested gap inside the CHoCH move. It can be adjusted if a different wick/body definition is intended.
 
 ## Risk and outcome
 
-- Bullish stop: near and below the lowest closed candle-body point before CHoCH, buffered by 5% of that candle's full high-low range.
-- Bearish stop: near and above the highest closed candle-body point before CHoCH, buffered by 5% of that candle's full high-low range.
+- Bullish stop: near and below the latest confirmed opposing swing wick before CHoCH, buffered by 5% of that candle's full high-low range.
+- Bearish stop: near and above the latest confirmed opposing swing wick before CHoCH, buffered by 5% of that candle's full high-low range.
 - `1R` is the distance from FVG midpoint entry to that stop.
 - Target is exactly `4R` from entry.
 - If one candle contains both stop and target, the engine records the stop first (`−1R`) because candle data cannot reveal intrabar ordering.
@@ -58,6 +58,8 @@ This is the current precise interpretation of the requested gap inside the CHoCH
 ## Direction filter
 
 A 1-minute FVG setup is valid only when its direction matches the timestamp-aligned 15-minute structural bias. Neutral 15-minute structure produces no entry.
+
+The chart still displays the selected one-minute setup when it is counter to the 15-minute bias, using the gold possible-trade style. Only an aligned setup receives the green style and is eligible for a persisted notification.
 
 Aligned setups are processed chronologically through one trade slot. A later signal is ignored until the selected setup wins, loses, or is cancelled. After a database reset, live scanning and charting ignore all setups detected before the persisted reset timestamp.
 

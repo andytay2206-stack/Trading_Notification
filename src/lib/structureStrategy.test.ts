@@ -63,8 +63,8 @@ describe('market structure strategy', () => {
 
     expect(bullish).toBeDefined()
     expect(bullish?.midpoint).toBe(9.35)
-    expect(bullish?.stopPrice).toBeCloseTo(7.92)
-    expect(bullish?.targetPrice).toBeCloseTo(15.07)
+    expect(bullish?.stopPrice).toBeCloseTo(7.52)
+    expect(bullish?.targetPrice).toBeCloseTo(16.67)
     expect(bullish?.status).toBe('won')
   })
 
@@ -77,7 +77,7 @@ describe('market structure strategy', () => {
     expect(setup?.status).toBe('cancelled')
     expect(setup?.exitTime).toBe(data[12].time)
     expect(setup?.exitPrice).toBe(10)
-    expect(setup?.rResult).toBeCloseTo((10 - 9.35) / (9.35 - 7.92))
+    expect(setup?.rResult).toBeCloseTo((10 - 9.35) / (9.35 - 7.52))
   })
 
   it('ignores later setups until the selected setup has finished', () => {
@@ -122,12 +122,12 @@ describe('market structure strategy', () => {
 
     expect(setup?.direction).toBe('short')
     expect(setup?.choch.brokenSwing).toMatchObject({ index: 11, price: 77222.5, type: 'low' })
-    expect(setup?.choch.invalidationSwing).toMatchObject({ index: 19, price: 77319.9, type: 'high' })
+    expect(setup?.choch.invalidationSwing).toMatchObject({ index: 19, price: 77322, type: 'high' })
     expect(setup?.bottom).toBe(77200.2)
     expect(setup?.top).toBe(77217.4)
     expect(setup?.midpoint).toBeCloseTo(77208.8)
-    expect(setup?.stopPrice).toBeCloseTo(77324.28)
-    expect(setup?.targetPrice).toBeCloseTo(76746.88)
+    expect(setup?.stopPrice).toBeCloseTo(77326.38)
+    expect(setup?.targetPrice).toBeCloseTo(76738.48)
     expect(setup?.status).toBe('open')
   })
 
@@ -170,13 +170,55 @@ describe('market structure strategy', () => {
 
     expect(setup?.direction).toBe('short')
     expect(setup?.choch.brokenSwing.price).toBe(77509.5)
-    expect(setup?.choch.invalidationSwing.price).toBe(77708.4)
+    expect(setup?.choch.invalidationSwing.price).toBe(77777.9)
     expect(setup?.startTime).toBe(data[leadIn.length + 9].time)
     expect(setup?.bottom).toBe(77563.5)
     expect(setup?.top).toBe(77613.9)
     expect(setup?.midpoint).toBeCloseTo(77588.7)
-    expect(setup?.stopPrice).toBeCloseTo(77713.725)
+    expect(setup?.stopPrice).toBeCloseTo(77783.225)
     expect(setup?.entryTime).toBe(data[leadIn.length + 19].time)
     expect(setup?.status).toBe('filled')
+  })
+
+  it('uses the completed 06:35 FVG for the 06:39 bullish CHoCH', () => {
+    const leadIn: Array<[number, number, number, number]> = [
+      [77800, 77820, 77780, 77800],
+      [77800, 77900, 77790, 77850],
+      [77850, 77860, 77650, 77700],
+      [77700, 77800, 77680, 77750],
+      [77750, 77760, 77550, 77600],
+    ]
+    const example: Array<[number, number, number, number]> = [
+      [77560, 77600, 77560, 77600],
+      [77600, 77604, 77597.4, 77598.3],
+      [77598.3, 77630, 77556.9, 77565.4],
+      [77565.4, 77591.3, 77565.4, 77573],
+      [77573, 77573, 77504.3, 77510.4],
+      [77510.4, 77511.2, 77461.9, 77488.2],
+      [77488.2, 77495.8, 77458.9, 77461.5],
+      [77461.5, 77477.9, 77449.8, 77458.1],
+      [77458.1, 77471.4, 77441.5, 77441.5],
+      [77441.5, 77490.6, 77408.3, 77488.8],
+      [77488.8, 77500, 77466.8, 77500],
+      [77500, 77525.6, 77500, 77509.2],
+      [77509.2, 77509.2, 77476.3, 77494],
+      [77494, 77494, 77486.8, 77492.8],
+      [77492.8, 77512.3, 77479.3, 77510.2],
+      [77510.2, 77631.4, 77510.2, 77630.4],
+    ]
+    const data = [...leadIn, ...example].map(([open, high, low, close], index) => candle(index, open, high, low, close))
+    const chochIndex = leadIn.length + 14
+    const analysis = analyzeStructure(data, { pivotLength: 2, stopBufferPercent: 5, rewardRisk: 4, maxSetupCandles: 180 })
+    const setup = analysis.fairValueGaps.find((gap) => gap.choch.index === chochIndex)
+
+    expect(setup?.direction).toBe('long')
+    expect(setup?.choch.invalidationSwing).toMatchObject({ index: leadIn.length + 9, price: 77408.3, type: 'low' })
+    expect(setup?.startTime).toBe(data[leadIn.length + 9].time)
+    expect(setup?.bottom).toBe(77490.6)
+    expect(setup?.top).toBe(77500)
+    expect(setup?.midpoint).toBeCloseTo(77495.3)
+    expect(setup?.stopPrice).toBeCloseTo(77404.185)
+    expect(setup?.targetPrice).toBeCloseTo(77859.76)
+    expect(setup?.status).toBe('open')
   })
 })
