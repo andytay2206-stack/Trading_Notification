@@ -86,6 +86,7 @@ export function Market() {
   const analysis = useMemo(() => analyzeStructure(candles.filter((candle) => candle.confirmed)), [candles])
   const fifteenMinuteAnalysis = useMemo(() => analyzeStructure(fifteenMinuteCandles.filter((candle) => candle.confirmed)), [fifteenMinuteCandles])
   const alignedSetups = useMemo(() => interval === '1' ? alignedOneMinuteSetups(analysis, fifteenMinuteAnalysis) : [], [analysis, fifteenMinuteAnalysis, interval])
+  const activeSetups = useMemo(() => alignedSetups.filter((setup) => setup.status === 'open' || setup.status === 'filled').slice(-1), [alignedSetups])
 
   return (
     <main>
@@ -128,7 +129,7 @@ export function Market() {
           </div>
           {error && candles.length === 0
             ? <div className="chart-error"><b>Market data unavailable</b><span>{error}. Check the connection and retry.</span><button type="button" className="secondary-button" onClick={() => setReloadKey((key) => key + 1)}>Retry feed</button></div>
-            : candles.length ? <CandleChart candles={candles} analysis={analysis} tradeSetups={interval === '1' ? alignedSetups : []} /> : <div className="chart-loading"><i /><span>Loading Bybit candles…</span></div>}
+            : candles.length ? <CandleChart candles={candles} analysis={analysis} tradeSetups={interval === '1' ? activeSetups : []} /> : <div className="chart-loading"><i /><span>Loading Bybit candles…</span></div>}
         </div>
 
         <aside className="trade-rail">

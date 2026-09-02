@@ -58,10 +58,13 @@ The scanner tracks every valid setup virtually. When it resolves:
 - Check means the user took the trade; the result enters portfolio statistics and history.
 - Cross means the user did not take the trade; it remains in signal history but does not affect portfolio statistics.
 
+## Chart display policy
+
+To keep the automated chart readable, only the newest setup whose FVG is waiting for entry or whose virtual trade is active receives entry, stop, target, and risk/reward shading. Resolved and expired trade levels are removed. The reward area is translucent green from entry to target; the risk area is translucent red from entry to stop. Only a small recent set of swing segments and CHoCH context remains visible.
+
 ## Known limitations
 
 - Fees, funding, spread, and slippage are excluded.
 - The scanner currently runs when the dashboard requests a scan; an always-on background worker is still planned.
 - A maximum of 1,000 one-minute candles is evaluated per scan due to the upstream endpoint limit.
 - Strategy behavior should be reviewed visually against known examples before being treated as production trading guidance.
-

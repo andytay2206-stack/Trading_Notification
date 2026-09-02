@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import {
+  BaselineSeries,
   CandlestickSeries,
   ColorType,
   createSeriesMarkers,
@@ -33,7 +34,7 @@ export function CandleChart({ candles, analysis, tradeSetups = [] }: CandleChart
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
-  const overlaySeriesRef = useRef<ISeriesApi<'Line'>[]>([])
+  const overlaySeriesRef = useRef<Array<ISeriesApi<'Line'> | ISeriesApi<'Baseline'>>>([])
   const markerPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
   const firstTimeRef = useRef<number | null>(null)
 
@@ -106,7 +107,8 @@ export function CandleChart({ candles, analysis, tradeSetups = [] }: CandleChart
     overlaySeriesRef.current.forEach((series) => chart.removeSeries(series))
     overlaySeriesRef.current = []
 
-    const recentSwings = analysis.swings.slice(-12)
+    const activeSetup = tradeSetups.filter((setup) => setup.status === 'open' || setup.status === 'filled').at(-1)
+    const recentSwings = analysis.swings.slice(-6)
     ;(['high', 'low'] as const).forEach((type) => {
       const points = recentSwings.filter((swing) => swing.type === type)
       for (let index = 1; index < points.length; index += 1) {
@@ -126,7 +128,10 @@ export function CandleChart({ candles, analysis, tradeSetups = [] }: CandleChart
       }
     })
 
-    analysis.fairValueGaps.slice(-6).forEach((gap) => {
+    const displayedGaps = activeSetup
+      ? [activeSetup]
+      : analysis.fairValueGaps.filter((gap) => gap.status === 'open' || gap.status === 'filled').slice(-1)
+    displayedGaps.forEach((gap) => {
       ;[gap.top, gap.bottom].forEach((price, boundaryIndex) => {
         const line = chart.addSeries(LineSeries, {
           color: gap.direction === 'long' ? 'rgba(57, 217, 138, .7)' : 'rgba(255, 92, 108, .7)',
@@ -145,11 +150,51 @@ export function CandleChart({ candles, analysis, tradeSetups = [] }: CandleChart
       })
     })
 
-    tradeSetups.slice(-2).forEach((setup) => {
+    if (activeSetup) {
+      const bandStart = (activeSetup.entryTime ?? activeSetup.startTime) as Time
+      const bandEnd = activeSetup.endTime as Time
+      const rewardBand = chart.addSeries(BaselineSeries, {
+        baseValue: { type: 'price', price: activeSetup.midpoint },
+        relativeGradient: true,
+        topFillColor1: 'rgba(57, 217, 138, .18)',
+        topFillColor2: 'rgba(57, 217, 138, .06)',
+        topLineColor: 'rgba(57, 217, 138, 0)',
+        bottomFillColor1: 'rgba(57, 217, 138, .06)',
+        bottomFillColor2: 'rgba(57, 217, 138, .18)',
+        bottomLineColor: 'rgba(57, 217, 138, 0)',
+        lineWidth: 1,
+        lastValueVisible: false,
+        priceLineVisible: false,
+      })
+      rewardBand.setData([
+        { time: bandStart, value: activeSetup.targetPrice },
+        { time: bandEnd, value: activeSetup.targetPrice },
+      ])
+      overlaySeriesRef.current.push(rewardBand)
+
+      const riskBand = chart.addSeries(BaselineSeries, {
+        baseValue: { type: 'price', price: activeSetup.midpoint },
+        relativeGradient: true,
+        topFillColor1: 'rgba(255, 92, 108, .18)',
+        topFillColor2: 'rgba(255, 92, 108, .06)',
+        topLineColor: 'rgba(255, 92, 108, 0)',
+        bottomFillColor1: 'rgba(255, 92, 108, .06)',
+        bottomFillColor2: 'rgba(255, 92, 108, .18)',
+        bottomLineColor: 'rgba(255, 92, 108, 0)',
+        lineWidth: 1,
+        lastValueVisible: false,
+        priceLineVisible: false,
+      })
+      riskBand.setData([
+        { time: bandStart, value: activeSetup.stopPrice },
+        { time: bandEnd, value: activeSetup.stopPrice },
+      ])
+      overlaySeriesRef.current.push(riskBand)
+
       const levels = [
-        { price: setup.midpoint, title: 'ENTRY', color: '#dfbb74', style: LineStyle.Solid },
-        { price: setup.stopPrice, title: 'STOP · −1R', color: '#ff5c6c', style: LineStyle.Solid },
-        { price: setup.targetPrice, title: 'TARGET · +4R', color: '#39d98a', style: LineStyle.Solid },
+        { price: activeSetup.midpoint, title: 'ENTRY', color: '#dfbb74', style: LineStyle.Solid },
+        { price: activeSetup.stopPrice, title: 'STOP · −1R', color: '#ff5c6c', style: LineStyle.Solid },
+        { price: activeSetup.targetPrice, title: 'TARGET · +4R', color: '#39d98a', style: LineStyle.Solid },
       ]
       levels.forEach((level) => {
         const line = chart.addSeries(LineSeries, {
@@ -162,14 +207,15 @@ export function CandleChart({ candles, analysis, tradeSetups = [] }: CandleChart
           title: level.title,
         })
         line.setData([
-          { time: setup.startTime as Time, value: level.price },
-          { time: setup.endTime as Time, value: level.price },
+          { time: activeSetup.startTime as Time, value: level.price },
+          { time: activeSetup.endTime as Time, value: level.price },
         ])
         overlaySeriesRef.current.push(line)
       })
-    })
+    }
 
-    markerPluginRef.current?.setMarkers(analysis.chochEvents.slice(-20).map((event) => ({
+    const displayedChoch = activeSetup ? [activeSetup.choch] : analysis.chochEvents.slice(-2)
+    markerPluginRef.current?.setMarkers(displayedChoch.map((event) => ({
       time: event.time as Time,
       position: event.direction === 'long' ? 'belowBar' as const : 'aboveBar' as const,
       shape: event.direction === 'long' ? 'arrowUp' as const : 'arrowDown' as const,

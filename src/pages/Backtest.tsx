@@ -50,6 +50,7 @@ export function Backtest() {
   const chartAnalysis = useMemo(() => analyzeStructure(candles), [candles])
   const biasAnalysis = useMemo(() => analyzeStructure(fifteenMinuteCandles), [fifteenMinuteCandles])
   const chartSetups = useMemo(() => alignedOneMinuteSetups(chartAnalysis, biasAnalysis), [chartAnalysis, biasAnalysis])
+  const latestChartSetup = useMemo(() => chartSetups.filter((setup) => setup.status === 'open' || setup.status === 'filled').slice(-1), [chartSetups])
 
   return (
     <main>
@@ -110,7 +111,7 @@ export function Backtest() {
                   <div><div className="overline">Random sample</div><h2>Historical BTCUSDT</h2></div>
                   <span className="muted">{first && last ? `${new Date(first.time * 1000).toLocaleDateString()} — ${new Date(last.time * 1000).toLocaleDateString()}` : ''}</span>
                 </div>
-                <CandleChart candles={candles} analysis={chartAnalysis} tradeSetups={chartSetups} />
+                <CandleChart candles={candles} analysis={chartAnalysis} tradeSetups={latestChartSetup} />
               </section>
 
               <section className="panel trade-table-panel backtest-trades">
