@@ -53,12 +53,14 @@ export function CandleChart({
   const markerPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
   const firstSeriesTimeRef = useRef<number | null>(null)
   const lastSeriesTimeRef = useRef<number | null>(null)
+  const fittedSetupIdRef = useRef<string | null>(null)
   const followLatestRef = useRef(true)
   const [isFollowingLatest, setIsFollowingLatest] = useState(true)
   const visibleSetups = showResolvedSetups
     ? tradeSetups
     : tradeSetups.filter((setup) => setup.status === 'open' || setup.status === 'filled')
   const alignedSetupIdSet = new Set(alignedSetupIds ?? visibleSetups.map((setup) => setup.id))
+  const primarySetup = visibleSetups.at(-1)
 
   const showLatestCandles = () => {
     const chart = chartRef.current
@@ -67,6 +69,10 @@ export function CandleChart({
     setIsFollowingLatest(true)
     chart.priceScale('right').applyOptions({ autoScale: true })
     chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, candles.length - 140), to: candles.length + 4 })
+  }
+
+  const fitSetupLevels = () => {
+    chartRef.current?.priceScale('right').applyOptions({ autoScale: true })
   }
 
   useEffect(() => {
@@ -141,6 +147,7 @@ export function CandleChart({
       overlaySeriesRef.current = []
       firstSeriesTimeRef.current = null
       lastSeriesTimeRef.current = null
+      fittedSetupIdRef.current = null
       followLatestRef.current = true
     }
   }, [])
@@ -208,14 +215,15 @@ export function CandleChart({
     ).values()]
     displayedGaps.forEach((gap) => {
       const zoneColor = gap.direction === 'long' ? '38, 166, 154' : '239, 83, 80'
+      const isSelectedGap = visibleSetups.some((setup) => setup.id === gap.id)
       const zone = chart.addSeries(BaselineSeries, {
         baseValue: { type: 'price', price: gap.bottom },
         relativeGradient: true,
-        topFillColor1: `rgba(${zoneColor}, .10)`,
-        topFillColor2: `rgba(${zoneColor}, .03)`,
-        topLineColor: `rgba(${zoneColor}, 0)`,
-        bottomFillColor1: `rgba(${zoneColor}, .03)`,
-        bottomFillColor2: `rgba(${zoneColor}, .10)`,
+        topFillColor1: `rgba(${zoneColor}, ${isSelectedGap ? '.28' : '.10'})`,
+        topFillColor2: `rgba(${zoneColor}, ${isSelectedGap ? '.12' : '.03'})`,
+        topLineColor: `rgba(${zoneColor}, ${isSelectedGap ? '.72' : '0'})`,
+        bottomFillColor1: `rgba(${zoneColor}, ${isSelectedGap ? '.12' : '.03'})`,
+        bottomFillColor2: `rgba(${zoneColor}, ${isSelectedGap ? '.28' : '.10'})`,
         bottomLineColor: `rgba(${zoneColor}, 0)`,
         lineWidth: 1,
         lastValueVisible: false,
@@ -245,7 +253,6 @@ export function CandleChart({
         lineWidth: 1,
         lastValueVisible: false,
         priceLineVisible: false,
-        autoscaleInfoProvider: () => null,
       })
       rewardBand.setData([
         { time: bandStart, value: activeSetup.targetPrice },
@@ -265,7 +272,6 @@ export function CandleChart({
         lineWidth: 1,
         lastValueVisible: false,
         priceLineVisible: false,
-        autoscaleInfoProvider: () => null,
       })
       riskBand.setData([
         { time: bandStart, value: activeSetup.stopPrice },
@@ -284,8 +290,11 @@ export function CandleChart({
         lastValueVisible: false,
         priceLineVisible: false,
         crosshairMarkerVisible: false,
-        autoscaleInfoProvider: () => null,
       })
+      levelHost.setData([
+        { time: bandStart, value: activeSetup.midpoint },
+        { time: bandEnd, value: activeSetup.midpoint },
+      ])
       overlaySeriesRef.current.push(levelHost)
       levels.forEach((level) => {
         levelHost.createPriceLine({
@@ -299,6 +308,13 @@ export function CandleChart({
         })
       })
     })
+
+    if (primarySetup && fittedSetupIdRef.current !== primarySetup.id) {
+      chart.priceScale('right').applyOptions({ autoScale: true })
+      fittedSetupIdRef.current = primarySetup.id
+    } else if (!primarySetup) {
+      fittedSetupIdRef.current = null
+    }
 
     const recentChoch = analysis.chochEvents.filter((event) => event.time >= oneHourAgo)
     const displayedChoch = [...new Map(
@@ -342,12 +358,19 @@ export function CandleChart({
       <div className="chart-auto-label"><i />Automated strategy view</div>
       <div className="chart-navigation">
         <span>Wheel: zoom · Drag: move · Drag axes: scale · Double-click axes: reset</span>
+        {primarySetup && <div className="chart-level-readout">
+          <span>FVG {primarySetup.bottom.toFixed(1)}–{primarySetup.top.toFixed(1)}</span>
+          <span>ENTRY {primarySetup.midpoint.toFixed(1)}</span>
+          <span className="negative">SL {primarySetup.stopPrice.toFixed(1)}</span>
+          <span className="positive">TP {primarySetup.targetPrice.toFixed(1)}</span>
+        </div>}
         {visibleSetups.length > 0 && !showResolvedSetups && (
-          <b className="chart-setup-state aligned">
+          <b className={`chart-setup-state ${primarySetup && alignedSetupIdSet.has(primarySetup.id) ? 'aligned' : ''}`}>
             {visibleSetups.filter((setup) => setup.status === 'filled').length} active · {visibleSetups.filter((setup) => setup.status === 'open').length} waiting
           </b>
         )}
         {visibleSetups.length > 0 && showResolvedSetups && <b className="chart-setup-state aligned">Selected backtest trade</b>}
+        {primarySetup && <button type="button" onClick={fitSetupLevels}>Fit setup</button>}
         {!isFollowingLatest && <button type="button" onClick={showLatestCandles}>Latest candles</button>}
       </div>
       <div className="chart-canvas" ref={containerRef} />

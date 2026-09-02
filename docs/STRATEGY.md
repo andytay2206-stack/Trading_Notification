@@ -75,6 +75,8 @@ The scanner tracks the selected setup virtually. When it resolves:
 
 The single selected live setup retains its entry, stop, target, and risk/reward shading while waiting or active. Won, lost, and cancelled live levels are removed immediately. In backtesting, selecting a completed journal row restores that trade's entry, stop, target, and shading for review. Entry, stop, and target use viewport-wide price lines so they remain visible while navigating left or right. The reward area is translucent green from entry to target; the risk area is translucent red from entry to stop.
 
+When a setup first appears, the price scale automatically fits its FVG, entry, stop, and target. The chart toolbar repeats all four numeric levels and provides **Fit setup** to restore the complete risk/reward view after manual vertical navigation. The selected FVG uses stronger shading than contextual gaps.
+
 The setup receives a time-stamped candle tag. A short tag sits above its entry or CHoCH candle; a long tag sits below it.
 
 CHoCH is drawn as an orange dashed break line and marker. Three recent softly shaded, direction-colored FVG zones remain visible for context, along with the selected setup if its originating CHoCH has moved outside the one-hour window. Compact labeled trend lines connect the latest swing highs and swing lows. Colors and annotation hierarchy follow TradingView's dark-chart conventions.
