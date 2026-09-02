@@ -27,7 +27,7 @@ export interface FairValueGap {
   choch: ChochEvent
   stopPrice: number
   targetPrice: number
-  status: 'open' | 'filled' | 'won' | 'lost' | 'cancelled'
+  status: 'open' | 'filled' | 'won' | 'lost' | 'missed' | 'cancelled'
   entryTime?: number
   exitTime?: number
   exitPrice?: number
@@ -46,14 +46,12 @@ export interface StrategySettings {
   pivotLength: number
   stopBufferPercent: number
   rewardRisk: number
-  maxSetupCandles: number
 }
 
 export const defaultStructureSettings: StrategySettings = {
   pivotLength: 2,
   stopBufferPercent: 5,
   rewardRisk: 4,
-  maxSetupCandles: 180,
 }
 
 export function findSwingPoints(candles: Candle[], pivotLength = 2): SwingPoint[] {
@@ -204,22 +202,26 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
       status: 'open',
     }
 
-    const cancellationIndex = choch.index + settings.maxSetupCandles
     const evaluationStart = Math.max(choch.index + 1, middleIndex + 2)
     for (let index = evaluationStart; index < candles.length; index += 1) {
       const candle = candles[index]
       if (!gap.entryTime) {
-        if (index >= cancellationIndex) {
-          gap.status = 'cancelled'
+        const touchedEntry = candle.low <= midpoint && candle.high >= midpoint
+        const passedTarget = choch.direction === 'long'
+          ? candle.high >= targetPrice
+          : candle.low <= targetPrice
+        if (!touchedEntry && passedTarget) {
+          gap.status = 'missed'
           gap.exitTime = candle.time
+          gap.exitPrice = targetPrice
           gap.rResult = 0
           break
         }
-        if (candle.low <= midpoint && candle.high >= midpoint) {
+        if (touchedEntry) {
           gap.entryTime = candle.time
           gap.status = 'filled'
         }
-        continue
+        if (!gap.entryTime) continue
       }
       const stopped = choch.direction === 'long' ? candle.low <= stopPrice : candle.high >= stopPrice
       const targeted = choch.direction === 'long' ? candle.high >= targetPrice : candle.low <= targetPrice
@@ -235,15 +237,6 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
         gap.exitTime = candle.time
         gap.exitPrice = targetPrice
         gap.rResult = settings.rewardRisk
-        break
-      }
-      if (index >= cancellationIndex) {
-        gap.status = 'cancelled'
-        gap.exitTime = candle.time
-        gap.exitPrice = candle.close
-        gap.rResult = choch.direction === 'long'
-          ? (candle.close - midpoint) / risk
-          : (midpoint - candle.close) / risk
         break
       }
     }

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { CandleChart } from '../components/CandleChart'
 import { formatCurrency } from '../lib/currency'
 import { randomHistoricalEnd, runStructureBacktest, type BacktestConfig, type BacktestResult } from '../lib/backtest'
-import { alignedOneMinuteSetups, analyzeStructure, oneSetupAtATime } from '../lib/structureStrategy'
+import { analyzeStructure, oneSetupAtATime } from '../lib/structureStrategy'
 import { fetchCandleRange } from '../services/bybit'
 import { saveBacktestRun } from '../services/api'
 import type { Candle } from '../types'
@@ -25,7 +25,6 @@ export function Backtest() {
   const [candles, setCandles] = useState<Candle[]>([])
   const [windowStart, setWindowStart] = useState<number | null>(null)
   const [windowEnd, setWindowEnd] = useState<number | null>(null)
-  const [fifteenMinuteCandles, setFifteenMinuteCandles] = useState<Candle[]>([])
   const [result, setResult] = useState<BacktestResult | null>(null)
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -50,7 +49,6 @@ export function Backtest() {
       await saveBacktestRun(runConfig, backtestResult, selectedCandles)
       setConfig(runConfig)
       setCandles(historicalCandles)
-      setFifteenMinuteCandles(biasCandles)
       setWindowStart(start / 1000)
       setWindowEnd(end / 1000)
       setResult(backtestResult)
@@ -63,12 +61,11 @@ export function Backtest() {
   }
 
   const chartAnalysis = useMemo(() => analyzeStructure(candles), [candles])
-  const biasAnalysis = useMemo(() => analyzeStructure(fifteenMinuteCandles), [fifteenMinuteCandles])
   const chartSetups = useMemo(
-    () => oneSetupAtATime(alignedOneMinuteSetups(chartAnalysis, biasAnalysis))
+    () => oneSetupAtATime(chartAnalysis.fairValueGaps)
       .filter((setup) => setup.choch.time >= (windowStart ?? Number.NEGATIVE_INFINITY)
         && setup.choch.time <= (windowEnd ?? Number.POSITIVE_INFINITY)),
-    [chartAnalysis, biasAnalysis, windowStart, windowEnd],
+    [chartAnalysis, windowStart, windowEnd],
   )
   const selectedSetup = useMemo(
     () => chartSetups.find((setup) => setup.id === selectedTradeId),

@@ -80,7 +80,7 @@ export async function initializeDatabase() {
       target_price NUMERIC(20, 8) NOT NULL,
       exit_price NUMERIC(20, 8),
       risk_usd NUMERIC(14, 2) NOT NULL,
-      outcome TEXT NOT NULL CHECK (outcome IN ('waiting', 'active', 'win', 'loss', 'cancelled')),
+      outcome TEXT NOT NULL CHECK (outcome IN ('waiting', 'active', 'win', 'loss', 'missed', 'cancelled')),
       r_result NUMERIC(12, 4) NOT NULL DEFAULT 0,
       decision TEXT CHECK (decision IN ('accepted', 'dismissed')),
       decided_at TIMESTAMPTZ,
@@ -108,7 +108,7 @@ export async function initializeDatabase() {
     ALTER TABLE trade_notifications DROP CONSTRAINT IF EXISTS trade_notifications_outcome_check;
     UPDATE trade_notifications SET outcome = 'cancelled' WHERE outcome = 'expired';
     ALTER TABLE trade_notifications ADD CONSTRAINT trade_notifications_outcome_check
-      CHECK (outcome IN ('waiting', 'active', 'win', 'loss', 'cancelled'));
+      CHECK (outcome IN ('waiting', 'active', 'win', 'loss', 'missed', 'cancelled'));
   `)
 
   const passwordHash = await bcrypt.hash(config.adminPassword, 12)

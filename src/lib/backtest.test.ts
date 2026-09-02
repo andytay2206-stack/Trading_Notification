@@ -28,10 +28,10 @@ describe('runStructureBacktest', () => {
     expect(result.winRate).toBe(100)
   })
 
-  it('returns no trades when higher-timeframe bias is unavailable', () => {
+  it('tracks the one-minute setup when higher-timeframe bias is unavailable', () => {
     const result = runStructureBacktest(candles(60), candles(900).slice(0, 2), config)
-    expect(result.trades).toHaveLength(0)
-    expect(result.netR).toBe(0)
+    expect(result.trades).toHaveLength(1)
+    expect(result.netR).toBe(4)
   })
 
   it('only scores setups detected inside the selected historical window', () => {

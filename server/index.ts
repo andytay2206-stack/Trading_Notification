@@ -126,10 +126,10 @@ app.get('/api/strategy/state', async (request, response) => {
 
 app.get('/api/strategy/notifications', async (request, response) => {
   const result = await pool.query(
-    `SELECT id, signal_key, direction, higher_timeframe_bias, detected_at, entry_time, exit_time,
+    `SELECT id, signal_key, strategy_version, direction, higher_timeframe_bias, detected_at, entry_time, exit_time,
        entry_price, stop_price, target_price, exit_price, risk_usd, outcome, r_result, decision, decided_at
      FROM trade_notifications
-     WHERE user_id = $1 AND (strategy_version = 'structure-v5' OR decision IS NOT NULL)
+     WHERE user_id = $1
      ORDER BY detected_at DESC LIMIT 100`,
     [request.user!.id],
   )

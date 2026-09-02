@@ -1,11 +1,11 @@
-import { alignedOneMinuteSetups, analyzeStructure, oneSetupAtATime } from '../src/lib/structureStrategy.js'
+import { analyzeStructure, oneSetupAtATime } from '../src/lib/structureStrategy.js'
 import type { Candle } from '../src/types.js'
 import { restClient } from './bybit.js'
 import { config } from './config.js'
 import { pool } from './db.js'
 import type { FairValueGap } from '../src/lib/structureStrategy.js'
 
-const STRATEGY_VERSION = 'structure-v5'
+const STRATEGY_VERSION = 'structure-v6'
 
 export async function getStrategyRuntime(userId: string) {
   const result = await pool.query<{ started_at: Date }>(
@@ -42,9 +42,33 @@ async function loadCandles(interval: '1' | '15', limit: number): Promise<Candle[
 const outcomeFor = (setup: FairValueGap) => {
   if (setup.status === 'won') return { outcome: 'win', rResult: setup.rResult ?? 4 }
   if (setup.status === 'lost') return { outcome: 'loss', rResult: setup.rResult ?? -1 }
+  if (setup.status === 'missed') return { outcome: 'missed', rResult: 0 }
   if (setup.status === 'cancelled') return { outcome: 'cancelled', rResult: setup.rResult ?? 0 }
   if (setup.status === 'filled') return { outcome: 'active', rResult: 0 }
   return { outcome: 'waiting', rResult: 0 }
+}
+
+async function reconcileExistingPredictions(userId: string, setups: FairValueGap[]) {
+  const pending = await pool.query<{ id: string; signal_key: string }>(
+    `SELECT id, signal_key FROM trade_notifications
+     WHERE user_id = $1 AND outcome IN ('waiting', 'active')`,
+    [userId],
+  )
+  const byId = new Map(setups.map((setup) => [setup.id, setup]))
+  for (const notification of pending.rows) {
+    const setupId = notification.signal_key.slice(notification.signal_key.indexOf(':') + 1)
+    const setup = byId.get(setupId)
+    if (!setup || !['won', 'lost', 'missed'].includes(setup.status)) continue
+    const result = outcomeFor(setup)
+    await pool.query(
+      `UPDATE trade_notifications SET
+         entry_time = TO_TIMESTAMP($3), exit_time = TO_TIMESTAMP($4), exit_price = $5,
+         outcome = $6, r_result = $7, updated_at = NOW()
+       WHERE id = $1 AND user_id = $2`,
+      [notification.id, userId, setup.entryTime ?? null, setup.exitTime ?? null,
+        setup.exitPrice ?? null, result.outcome, result.rResult],
+    )
+  }
 }
 
 export async function scanStrategy(userId: string) {
@@ -54,14 +78,18 @@ export async function scanStrategy(userId: string) {
   ])
   const oneMinute = analyzeStructure(oneMinuteCandles.filter((candle) => candle.confirmed))
   const fifteenMinute = analyzeStructure(fifteenMinuteCandles.filter((candle) => candle.confirmed))
+  await reconcileExistingPredictions(userId, oneMinute.fairValueGaps)
   const runtime = await getStrategyRuntime(userId)
   const startedAtSeconds = runtime.startedAt.getTime() / 1000
-  const eligible = alignedOneMinuteSetups(oneMinute, fifteenMinute)
+  const eligible = oneMinute.fairValueGaps
     .filter((setup) => setup.choch.time >= startedAtSeconds)
   const setups = oneSetupAtATime(eligible)
 
   for (const setup of setups) {
     const result = outcomeFor(setup)
+    const knownBias = fifteenMinute.biasChanges
+      .filter((change) => change.time <= setup.choch.time)
+      .at(-1)?.direction ?? 'neutral'
     await pool.query(
       `INSERT INTO trade_notifications
         (user_id, signal_key, strategy_version, direction, higher_timeframe_bias, detected_at, entry_time, exit_time,
@@ -78,7 +106,7 @@ export async function scanStrategy(userId: string) {
          outcome = EXCLUDED.outcome,
          r_result = EXCLUDED.r_result,
          updated_at = NOW()`,
-      [userId, `${STRATEGY_VERSION}:${setup.id}`, STRATEGY_VERSION, setup.direction, fifteenMinute.bias, setup.choch.time,
+      [userId, `${STRATEGY_VERSION}:${setup.id}`, STRATEGY_VERSION, setup.direction, knownBias, setup.choch.time,
         setup.entryTime ?? null, setup.exitTime ?? null, setup.midpoint, setup.stopPrice,
         setup.targetPrice, setup.exitPrice ?? null, config.strategyRiskUsd, result.outcome, result.rResult],
     )
@@ -94,7 +122,7 @@ export async function decideNotification(userId: string, notificationId: string,
     const result = await client.query<{
       id: string
       direction: 'long' | 'short'
-      outcome: 'win' | 'loss' | 'active' | 'waiting' | 'cancelled'
+      outcome: 'win' | 'loss' | 'active' | 'waiting' | 'missed' | 'cancelled'
       entry_price: string
       stop_price: string
       target_price: string

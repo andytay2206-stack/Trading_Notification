@@ -62,6 +62,7 @@ export async function saveBacktestRun(config: BacktestConfig, result: BacktestRe
 export interface StrategyNotification {
   id: string
   signal_key: string
+  strategy_version: string
   direction: 'long' | 'short'
   higher_timeframe_bias: 'long' | 'short' | 'neutral'
   detected_at: string
@@ -72,7 +73,7 @@ export interface StrategyNotification {
   target_price: string
   exit_price: string | null
   risk_usd: string
-  outcome: 'waiting' | 'active' | 'win' | 'loss' | 'cancelled'
+  outcome: 'waiting' | 'active' | 'win' | 'loss' | 'missed' | 'cancelled'
   r_result: string
   decision: 'accepted' | 'dismissed' | null
   decided_at: string | null

@@ -41,7 +41,7 @@ Bybit historical candles
 Trade lifecycle → win rate / net R / USD profit / drawdown
 ```
 
-The backtest and live scanner share the same deterministic strategy module. Each 1-minute setup uses only the 15-minute bias known at that setup's timestamp, preventing look-ahead bias. If both stop and target fall inside the same candle, the stop is assumed to occur first.
+The backtest and live scanner share the same deterministic strategy module. Each 1-minute setup records only the 15-minute bias known at that timestamp, preventing look-ahead bias. Bias is contextual rather than a separate scheduling filter, so the chart and server share one chronological slot. If both stop and target fall inside the same candle, the stop is assumed to occur first.
 
 ## Automated strategy chart
 
@@ -54,27 +54,28 @@ The chart is built with TradingView Lightweight Charts. Its strategy annotations
 - a red `−1R` stop;
 - a green `+4R` target.
 
-The one-at-a-time one-minute setup receives viewport-wide price levels and remains visible until it wins, loses, or is cancelled at 180 candles. Gold identifies a possible setup against the current 15-minute bias; green identifies an aligned notification candidate. Its time-stamped tag is placed above the setup candle for shorts and below it for longs. Resolved live overlays are removed automatically; the backtest chart can deliberately restore one selected completed trade. Translucent green and red bands visualize reward and risk respectively. The selected gap is shaded more strongly, all FVG/entry/SL/TP values are repeated in the toolbar, and **Fit setup** restores their automatic price range. The chart retains orange structural-swing CHoCH break lines, three recent contextual FVGs, and compact labeled swing-high and swing-low trend lines.
+The one-at-a-time one-minute setup receives viewport-wide price levels and remains visible until its prediction is missed or its filled trade wins or loses. Gold identifies a setup against the current 15-minute bias; green identifies an aligned setup. Its time-stamped tag is placed above the setup candle for shorts and below it for longs. Resolved live overlays are removed automatically; the backtest chart can deliberately restore one selected completed trade. Translucent green and red bands visualize reward and risk respectively. The selected gap is shaded more strongly, all FVG/entry/SL/TP values are repeated in the toolbar, and **Fit setup** restores their automatic price range.
 
 Live updates modify only new candle data. Strategy overlays are rebuilt only when a candle closes, not for every update to the current candle. Rolling the 300-candle window no longer resets the visible range, and trade overlays are excluded from automatic price scaling so a distant 4R target cannot compress the candle view into an apparently blank chart.
 
-Pending signals carry a strategy version. `structure-v5` identifies the one-slot, 180-candle lifecycle and cancellation accounting. The persisted runtime timestamp excludes pre-reset signals from both chart selection and notification storage.
+Pending signals carry a strategy version. `structure-v6` identifies the unified one-slot, no-timeout lifecycle and automatic strategy measurement. Version-5 records remain available as legacy history; the persisted version-6 runtime timestamp defines the new measurement baseline.
 
 The chart, server scanner, notification outcomes, and backtester all consume the same strategy implementation.
 
 ## Notification decisions
 
-The server scans 500 closed 15-minute candles and 1,000 closed 1-minute candles. Post-reset aligned setups are processed chronologically through one slot and deduplicated in PostgreSQL. After a setup reaches its stop, target, or filled cancellation, the dashboard asks whether the user actually took it:
+The server scans 500 closed 15-minute candles and 1,000 closed 1-minute candles. Version-6 one-minute setups are processed chronologically through the same slot used by the chart and deduplicated in PostgreSQL. The dashboard separates waiting/active pullback predictions from finished history. After a filled setup reaches stop or target, the user may optionally record whether it was personally taken:
 
 - **Check:** adds the result to `trades`, portfolio profit, R, and win rate, while retaining notification history.
 - **Cross:** retains the setup in notification history but excludes it from portfolio performance.
 
-At 180 candles, an unfilled setup is automatically recorded as cancelled at `0R`. A filled setup closes at the final candle close; its partial R and USD P/L are persisted. Cancellations are excluded from win-rate denominators but remain included in net R and profit.
+There is no time cancellation. Filled trades remain active until TP or SL. An unfilled prediction that reaches TP without a midpoint pullback is recorded as missed/skipped at `0R` and excluded from the automatic strategy win-rate denominator.
 
 ## Performance definitions
 
 - **Net profit:** Sum of `pnlUsd` for closed trades. Other currencies are display conversions only.
-- **Overall win rate:** Wins divided by wins plus losses; cancellations and breakeven trades are excluded.
+- **Strategy win rate:** All version-6 filled wins divided by filled wins plus losses, independent of user decisions; missed predictions are excluded.
+- **Overall win rate:** Accepted portfolio wins divided by wins plus losses; legacy cancellations and breakeven trades are excluded.
 - **Today's win rate:** The same calculation restricted to decisive trades closed today in the user's local timezone.
 - **R-multiple:** Profit or loss divided by planned initial risk. For example, risking USD 100 and earning USD 200 is `+2R`; losing the planned USD 100 is `-1R`.
 - **Today's R:** Sum of R-multiples for trades closed today.

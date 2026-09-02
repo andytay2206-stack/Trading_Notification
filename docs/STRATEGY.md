@@ -5,10 +5,10 @@ This document is the executable interpretation currently shared by the automated
 ## Timeframes
 
 - `BTCUSDT` Bybit linear perpetual only.
-- The 15-minute chart determines direction.
+- The 15-minute chart supplies directional context and alignment status.
 - The 1-minute chart generates entries.
 - Only closed candles participate in structure and signal decisions.
-- Every historical 1-minute setup uses the 15-minute bias that was already known at that timestamp. Future bias is never applied retroactively.
+- Every setup stores the 15-minute bias already known at its timestamp. Future bias is never applied retroactively, but an opposing bias no longer hides or independently schedules a second trade.
 
 ## Swing structure
 
@@ -37,8 +37,7 @@ The structural leg from the invalidation swing through the CHoCH must contain a 
 - Bearish FVG: the following candle's high is below the preceding candle's low.
 - An FVG established at least one full closed candle before CHoCH is preferred. If several qualify, the widest gap is the most relevant displacement zone and a tie uses the nearest gap. If none was already established, a valid CHoCH-centered FVG may be used after its third candle closes.
 - Entry is the 50% midpoint between the two FVG boundaries.
-- A selected setup has a total lifetime of 180 one-minute candles from its CHoCH candle.
-- No newer setup is considered while the selected setup is waiting, filled, or active.
+- No newer setup is considered while the selected setup is waiting for entry or active after entry.
 
 In the 06:39 long example, the preferred established FVG is 06:34/06:35/06:36. Its boundaries are 77,490.6 and 77,500.0, giving a midpoint entry of 77,495.3. The 06:34 invalidation wick is 77,408.3 and the buffered stop is 77,404.2. The earlier 01:27 example remains valid when no earlier established FVG exists and the CHoCH candle itself is the middle displacement candle.
 
@@ -51,29 +50,26 @@ This is the current precise interpretation of the requested gap inside the CHoCH
 - `1R` is the distance from FVG midpoint entry to that stop.
 - Target is exactly `4R` from entry.
 - If one candle contains both stop and target, the engine records the stop first (`−1R`) because candle data cannot reveal intrabar ordering.
-- If an unfilled setup reaches 180 candles, it is cancelled automatically at `0R`.
-- If a filled trade reaches 180 candles without stop or target, it is cancelled at that candle's close. Its fractional R is the directional entry-to-close move divided by initial risk, and USD P/L is fractional R multiplied by configured risk USD.
+- A filled trade has no candle timeout. It remains active until its stop or target is reached.
+- If price reaches the target before returning to the midpoint entry, the prediction is closed as `missed`/`skipped` at `0R`. It is not counted as a trade, win, or loss because no post-CHoCH entry occurred.
 - The USD value of `1R` defaults to `STRATEGY_RISK_USD=100` in `.env`.
 
 ## Direction filter
 
-A 1-minute FVG setup is valid only when its direction matches the timestamp-aligned 15-minute structural bias. Neutral 15-minute structure produces no entry.
-
-The chart still displays the selected one-minute setup when it is counter to the 15-minute bias, using the gold possible-trade style. Only an aligned setup receives the green style and is eligible for a persisted notification.
-
-Aligned setups are processed chronologically through one trade slot. A later signal is ignored until the selected setup wins, loses, or is cancelled. After a database reset, live scanning and charting ignore all setups detected before the persisted reset timestamp.
+Every 1-minute setup is processed chronologically through the same persisted trade slot. The 15-minute direction is recorded as context: aligned setups are green and counter-bias setups are gold. Both use the same slot, preventing the chart and PostgreSQL scanner from selecting different overlapping trades. A later signal is ignored until the selected prediction is missed or its filled trade wins or loses.
 
 ## Portfolio decision
 
-The scanner tracks the selected setup virtually. When it resolves:
+The notification board contains only waiting pullback predictions and active entries. Finished results move automatically into history. When a filled setup resolves:
 
 - Check means the user took the trade; the result enters portfolio statistics and history.
 - Cross means the user did not take the trade; it remains in signal history but does not affect portfolio statistics.
-- A filled cancellation also receives Check/Cross and carries its actual partial R and P/L. An unfilled cancellation is recorded automatically at `0R` without a portfolio decision.
+- The automatic strategy win rate counts the result even when neither button is used. Check/Cross affects only the personal portfolio statistics.
+- Cancellations shown in history are preserved legacy records from the previous lifecycle and are not created by version 6.
 
 ## Chart display policy
 
-The single selected live setup retains its entry, stop, target, and risk/reward shading while waiting or active. Won, lost, and cancelled live levels are removed immediately. In backtesting, selecting a completed journal row restores that trade's entry, stop, target, and shading for review. Entry, stop, and target use viewport-wide price lines so they remain visible while navigating left or right. The reward area is translucent green from entry to target; the risk area is translucent red from entry to stop.
+The single selected live setup retains its entry, stop, target, and risk/reward shading while waiting or active. Won, lost, and missed live levels are removed immediately. In backtesting, selecting a completed journal row restores that trade's entry, stop, target, and shading for review. Entry, stop, and target use viewport-wide price lines so they remain visible while navigating left or right. The reward area is translucent green from entry to target; the risk area is translucent red from entry to stop.
 
 When a setup first appears, the price scale automatically fits its FVG, entry, stop, and target. The chart toolbar repeats all four numeric levels and provides **Fit setup** to restore the complete risk/reward view after manual vertical navigation. The selected FVG uses stronger shading than contextual gaps.
 

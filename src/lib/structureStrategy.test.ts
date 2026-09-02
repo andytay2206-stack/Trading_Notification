@@ -57,8 +57,8 @@ describe('market structure strategy', () => {
     expect(analysis.bias).toBe('neutral')
   })
 
-  it('keeps tracking a filled trade after its entry-wait window until the 4R target', () => {
-    const analysis = analyzeStructure(bullishSequence, { pivotLength: 1, stopBufferPercent: 5, rewardRisk: 4, maxSetupCandles: 4 })
+  it('keeps tracking a filled trade until the 4R target', () => {
+    const analysis = analyzeStructure(bullishSequence, { pivotLength: 1, stopBufferPercent: 5, rewardRisk: 4 })
     const bullish = analysis.fairValueGaps.find((gap) => gap.direction === 'long')
 
     expect(bullish).toBeDefined()
@@ -68,16 +68,30 @@ describe('market structure strategy', () => {
     expect(bullish?.status).toBe('won')
   })
 
-  it('cancels a filled trade at its lifetime close and records partial R', () => {
+  it('does not cancel a filled trade when neither stop nor target has been reached', () => {
     const data = [...bullishSequence]
     data[12] = candle(12, 10, 10.5, 9.8, 10)
-    const analysis = analyzeStructure(data, { pivotLength: 1, stopBufferPercent: 5, rewardRisk: 4, maxSetupCandles: 3 })
+    data[13] = candle(13, 10, 10.2, 9.8, 10)
+    for (let index = 14; index < 220; index += 1) data.push(candle(index, 10, 10.2, 9.8, 10))
+    const analysis = analyzeStructure(data, { pivotLength: 1, stopBufferPercent: 5, rewardRisk: 4 })
     const setup = analysis.fairValueGaps.find((gap) => gap.direction === 'long')
 
-    expect(setup?.status).toBe('cancelled')
-    expect(setup?.exitTime).toBe(data[12].time)
-    expect(setup?.exitPrice).toBe(10)
-    expect(setup?.rResult).toBeCloseTo((10 - 9.35) / (9.35 - 7.52))
+    expect(setup?.status).toBe('filled')
+    expect(setup?.exitTime).toBeUndefined()
+    expect(setup?.exitPrice).toBeUndefined()
+    expect(setup?.rResult).toBeUndefined()
+  })
+
+  it('marks a pullback prediction missed when target is reached before entry', () => {
+    const data = [...bullishSequence]
+    data[11] = candle(11, 12.8, 17, 10, 16)
+    const analysis = analyzeStructure(data, { pivotLength: 1, stopBufferPercent: 5, rewardRisk: 4 })
+    const setup = analysis.fairValueGaps.find((gap) => gap.direction === 'long')
+
+    expect(setup?.status).toBe('missed')
+    expect(setup?.entryTime).toBeUndefined()
+    expect(setup?.exitTime).toBe(data[11].time)
+    expect(setup?.rResult).toBe(0)
   })
 
   it('ignores later setups until the selected setup has finished', () => {
@@ -164,7 +178,7 @@ describe('market structure strategy', () => {
       [77623.1, 77632.1, 77576.9, 77577],
     ]
     const data = [...leadIn, ...example].map(([open, high, low, close], index) => candle(index, open, high, low, close))
-    const analysis = analyzeStructure(data, { pivotLength: 1, stopBufferPercent: 5, rewardRisk: 4, maxSetupCandles: 180 })
+    const analysis = analyzeStructure(data, { pivotLength: 1, stopBufferPercent: 5, rewardRisk: 4 })
     const chochIndex = leadIn.length + 14
     const setup = analysis.fairValueGaps.find((gap) => gap.choch.index === chochIndex)
 
@@ -208,7 +222,7 @@ describe('market structure strategy', () => {
     ]
     const data = [...leadIn, ...example].map(([open, high, low, close], index) => candle(index, open, high, low, close))
     const chochIndex = leadIn.length + 14
-    const analysis = analyzeStructure(data, { pivotLength: 2, stopBufferPercent: 5, rewardRisk: 4, maxSetupCandles: 180 })
+    const analysis = analyzeStructure(data, { pivotLength: 2, stopBufferPercent: 5, rewardRisk: 4 })
     const setup = analysis.fairValueGaps.find((gap) => gap.choch.index === chochIndex)
 
     expect(setup?.direction).toBe('long')
