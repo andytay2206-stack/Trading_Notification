@@ -4,7 +4,7 @@ import { restClient } from './bybit.js'
 import { config } from './config.js'
 import { pool } from './db.js'
 
-const STRATEGY_VERSION = 'structure-v2'
+const STRATEGY_VERSION = 'structure-v3'
 
 async function loadCandles(interval: '1' | '15', limit: number): Promise<Candle[]> {
   const response = await restClient.getKline({ category: 'linear', symbol: 'BTCUSDT', interval, limit })

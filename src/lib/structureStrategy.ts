@@ -13,6 +13,7 @@ export interface ChochEvent {
   index: number
   direction: TradeSide
   brokenSwing: SwingPoint
+  invalidationSwing: SwingPoint
 }
 
 export interface FairValueGap {
@@ -94,23 +95,35 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
       biasChanges.push({ time: candles[index].time, direction: inferred })
     }
     const candle = candles[index]
-    const previous = candles[index - 1]
-    const prior = candles[index - 2]
-    const bearishMove = previous.close < prior.close
-    const bullishMove = previous.close > prior.close
+    const latestHigh = highs.at(-1)
+    const latestLow = lows.at(-1)
 
-    if (trend === 'short' && bearishMove && candle.close > previous.high && index - 1 > lastBreakIndex) {
-      const brokenCandle: SwingPoint = { time: previous.time, price: previous.high, index: index - 1, type: 'high' }
-      chochEvents.push({ time: candle.time, price: candle.close, index, direction: 'long', brokenSwing: brokenCandle })
+    if (trend === 'short' && latestHigh && latestLow && latestLow.index > latestHigh.index
+      && candle.close > latestHigh.price && latestHigh.index > lastBreakIndex) {
+      chochEvents.push({
+        time: candle.time,
+        price: candle.close,
+        index,
+        direction: 'long',
+        brokenSwing: latestHigh,
+        invalidationSwing: latestLow,
+      })
       trend = 'long'
       biasChanges.push({ time: candle.time, direction: 'long' })
-      lastBreakIndex = index - 1
-    } else if (trend === 'long' && bullishMove && candle.close < previous.low && index - 1 > lastBreakIndex) {
-      const brokenCandle: SwingPoint = { time: previous.time, price: previous.low, index: index - 1, type: 'low' }
-      chochEvents.push({ time: candle.time, price: candle.close, index, direction: 'short', brokenSwing: brokenCandle })
+      lastBreakIndex = latestHigh.index
+    } else if (trend === 'long' && latestHigh && latestLow && latestHigh.index > latestLow.index
+      && candle.close < latestLow.price && latestLow.index > lastBreakIndex) {
+      chochEvents.push({
+        time: candle.time,
+        price: candle.close,
+        index,
+        direction: 'short',
+        brokenSwing: latestLow,
+        invalidationSwing: latestHigh,
+      })
       trend = 'short'
       biasChanges.push({ time: candle.time, direction: 'short' })
-      lastBreakIndex = index - 1
+      lastBreakIndex = latestLow.index
     }
   }
 
@@ -126,9 +139,15 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
     const top = bullishGap ? after.low : before.low
     const bottom = bullishGap ? before.high : after.high
     const midpoint = (top + bottom) / 2
-    const candleRange = Math.max(displacement.high - displacement.low, displacement.close * 0.0001)
-    const buffer = candleRange * (settings.stopBufferPercent / 100)
-    const stopPrice = choch.direction === 'long' ? displacement.low - buffer : displacement.high + buffer
+    const invalidationCandle = candles[choch.invalidationSwing.index]
+    const invalidationRange = Math.max(
+      invalidationCandle.high - invalidationCandle.low,
+      invalidationCandle.close * 0.0001,
+    )
+    const buffer = invalidationRange * (settings.stopBufferPercent / 100)
+    const stopPrice = choch.direction === 'long'
+      ? choch.invalidationSwing.price - buffer
+      : choch.invalidationSwing.price + buffer
     const risk = Math.abs(midpoint - stopPrice)
     const targetPrice = choch.direction === 'long'
       ? midpoint + risk * settings.rewardRisk

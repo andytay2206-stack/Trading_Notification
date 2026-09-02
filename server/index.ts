@@ -125,7 +125,7 @@ app.get('/api/strategy/notifications', async (request, response) => {
     `SELECT id, signal_key, direction, higher_timeframe_bias, detected_at, entry_time, exit_time,
        entry_price, stop_price, target_price, risk_usd, outcome, r_result, decision, decided_at
      FROM trade_notifications
-     WHERE user_id = $1 AND (strategy_version = 'structure-v2' OR decision IS NOT NULL)
+     WHERE user_id = $1 AND (strategy_version = 'structure-v3' OR decision IS NOT NULL)
      ORDER BY detected_at DESC LIMIT 100`,
     [request.user!.id],
   )

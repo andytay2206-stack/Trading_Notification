@@ -24,9 +24,10 @@ The two-candle confirmation means a pivot is known only after two later candles 
 ## Change of Character (CHoCH)
 
 - Swing structure first establishes whether the move is upward or downward.
-- During a downward move, a new candle closing above the immediately previous candle's high creates bullish CHoCH.
-- During an upward move, a new candle closing below the immediately previous candle's low creates bearish CHoCH.
-- A wick through the previous wick without a close beyond it does not qualify.
+- During a downward structural leg, a new candle closing above the preceding confirmed swing high creates bullish CHoCH.
+- During an upward structural leg, a new candle closing below the preceding confirmed swing low creates bearish CHoCH.
+- The opposite swing formed after the broken level is the setup's invalidation extreme. For example, after a swing low at 01:17 and a new swing high at 01:25, the 01:27 close below the 01:17 low is bearish CHoCH and the 01:25 high is the invalidation extreme.
+- A wick through the structural swing without a close beyond it does not qualify.
 
 ## Fair Value Gap (FVG)
 
@@ -41,8 +42,8 @@ This is the current precise interpretation of the requested gap inside the CHoCH
 
 ## Risk and outcome
 
-- Bullish stop: below the CHoCH candle low by 5% of that candle's full high-low range.
-- Bearish stop: above the CHoCH candle high by 5% of that candle's full high-low range.
+- Bullish stop: below the structural invalidation swing low by 5% of that swing candle's full high-low range.
+- Bearish stop: above the structural invalidation swing high by 5% of that swing candle's full high-low range.
 - `1R` is the distance from FVG midpoint entry to that stop.
 - Target is exactly `4R` from entry.
 - If one candle contains both stop and target, the engine records the stop first (`−1R`) because candle data cannot reveal intrabar ordering.

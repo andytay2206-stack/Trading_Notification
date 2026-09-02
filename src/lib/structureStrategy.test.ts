@@ -62,8 +62,50 @@ describe('market structure strategy', () => {
 
     expect(bullish).toBeDefined()
     expect(bullish?.midpoint).toBe(9.35)
-    expect(bullish?.stopPrice).toBeCloseTo(7.54)
-    expect(bullish?.targetPrice).toBeCloseTo(16.59)
+    expect(bullish?.stopPrice).toBeCloseTo(7.52)
+    expect(bullish?.targetPrice).toBeCloseTo(16.67)
     expect(bullish?.status).toBe('won')
+  })
+
+  it('matches the 01:17 low, 01:25 high, and 01:27 bearish CHoCH example', () => {
+    const values: Array<[number, number, number, number]> = [
+      [77157.2, 77160, 77129.6, 77130.9],
+      [77130.9, 77172, 77121.8, 77171.9],
+      [77171.9, 77172, 77113.6, 77126.5],
+      [77126.5, 77203.6, 77126.5, 77203.2],
+      [77203.2, 77266.8, 77197.1, 77261],
+      [77261, 77261.1, 77207.5, 77228.8],
+      [77228.8, 77342.9, 77204.4, 77328.3],
+      [77328.3, 77328.3, 77238.8, 77280.9],
+      [77280.9, 77328.7, 77280.9, 77310],
+      [77310, 77310, 77207.9, 77250.8],
+      [77250.8, 77262.5, 77205.4, 77222.5],
+      [77222.5, 77262, 77200, 77262],
+      [77262, 77319.1, 77262, 77296.8],
+      [77296.8, 77297.8, 77253.3, 77281.2],
+      [77281.2, 77288.9, 77239.5, 77239.5],
+      [77239.5, 77255, 77239.5, 77253.4],
+      [77253.4, 77272, 77238, 77254.2],
+      [77254.2, 77268.6, 77236.1, 77266.9],
+      [77266.9, 77319.9, 77266.9, 77319.9],
+      [77319.9, 77322, 77234.4, 77241.4],
+      [77241.4, 77255.9, 77217.4, 77223.5],
+      [77223.5, 77223.6, 77177, 77197.7],
+      [77197.7, 77200.2, 77118.5, 77142.5],
+      [77142.5, 77142.6, 77108.1, 77114.4],
+    ]
+    const data = values.map(([open, high, low, close], index) => candle(index, open, high, low, close))
+    const analysis = analyzeStructure(data)
+    const setup = analysis.fairValueGaps.find((gap) => gap.choch.index === 21)
+
+    expect(setup?.direction).toBe('short')
+    expect(setup?.choch.brokenSwing).toMatchObject({ index: 11, price: 77200, type: 'low' })
+    expect(setup?.choch.invalidationSwing).toMatchObject({ index: 19, price: 77322, type: 'high' })
+    expect(setup?.bottom).toBe(77200.2)
+    expect(setup?.top).toBe(77217.4)
+    expect(setup?.midpoint).toBeCloseTo(77208.8)
+    expect(setup?.stopPrice).toBeCloseTo(77326.38)
+    expect(setup?.targetPrice).toBeCloseTo(76738.48)
+    expect(setup?.status).toBe('open')
   })
 })
