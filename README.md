@@ -1,5 +1,7 @@
 # Northstar — Futures Trading Notifications
 
+Production dashboard: <https://trading-notification.vercel.app>
+
 Northstar is a notification-first futures monitor. A React interface talks to a Node API that retrieves Bitcoin market data through `bybit-api` and stores application results in PostgreSQL.
 
 > The application currently monitors public data only. It does not connect to an exchange account or place orders.

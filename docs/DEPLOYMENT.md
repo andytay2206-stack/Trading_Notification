@@ -1,5 +1,13 @@
 # Railway and Vercel Deployment
 
+## Current production endpoints
+
+- Dashboard: `https://trading-notification.vercel.app`
+- Railway API: `https://tradingnotification-production.up.railway.app`
+- Public healthcheck: `https://trading-notification.vercel.app/api/health`
+
+The production deployment was verified on 2026-09-02 for frontend delivery, Railway proxying, PostgreSQL connectivity, authentication cookies, live Bybit candle access, and persisted strategy state.
+
 The production layout keeps the browser and authentication same-origin while allowing the scanner to run continuously:
 
 - Vercel builds and serves the Vite/React frontend.
