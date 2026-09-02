@@ -23,13 +23,14 @@ The two-candle confirmation means a pivot is known only after two later candles 
 
 ## Change of Character (CHoCH)
 
-- During downward structure, a candle close above the latest confirmed swing high creates bullish CHoCH.
-- During upward structure, a candle close below the latest confirmed swing low creates bearish CHoCH.
-- A wick through structure without a close does not qualify.
+- Swing structure first establishes whether the move is upward or downward.
+- During a downward move, a new candle closing above the immediately previous candle's high creates bullish CHoCH.
+- During an upward move, a new candle closing below the immediately previous candle's low creates bearish CHoCH.
+- A wick through the previous wick without a close beyond it does not qualify.
 
 ## Fair Value Gap (FVG)
 
-The CHoCH candle is the middle displacement candle of a three-candle pattern:
+The CHoCH candle must also be the middle displacement candle of a three-candle pattern. CHoCH without FVG does not create an entry:
 
 - Bullish FVG: the following candle's low is above the preceding candle's high.
 - Bearish FVG: the following candle's high is below the preceding candle's low.
@@ -62,7 +63,7 @@ The scanner tracks every valid setup virtually. When it resolves:
 
 To keep the automated chart readable, only the newest setup whose FVG is waiting for entry or whose virtual trade is active receives entry, stop, target, and risk/reward shading. Resolved and expired trade levels are removed. The reward area is translucent green from entry to target; the risk area is translucent red from entry to stop.
 
-CHoCH markers and up to three direction-colored FVG zones remain visible for the latest one-hour window. Compact labeled trend lines connect the latest swing highs and swing lows. An active setup remains visible even if its originating CHoCH has just moved outside that one-hour context window.
+CHoCH is drawn as an orange dashed break line and marker. Up to three direction-colored FVG zones remain visible for the latest one-hour window. Compact labeled trend lines connect the latest swing highs and swing lows. An active setup remains visible even if its originating CHoCH has just moved outside that one-hour context window. Colors and annotation hierarchy follow TradingView's dark-chart conventions.
 
 ## Known limitations
 

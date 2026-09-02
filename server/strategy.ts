@@ -4,6 +4,8 @@ import { restClient } from './bybit.js'
 import { config } from './config.js'
 import { pool } from './db.js'
 
+const STRATEGY_VERSION = 'structure-v2'
+
 async function loadCandles(interval: '1' | '15', limit: number): Promise<Candle[]> {
   const response = await restClient.getKline({ category: 'linear', symbol: 'BTCUSDT', interval, limit })
   if (response.retCode !== 0) throw new Error(response.retMsg || 'Bybit rejected strategy candle request')
@@ -40,10 +42,10 @@ export async function scanStrategy(userId: string) {
     const result = outcomeFor(setup.status)
     await pool.query(
       `INSERT INTO trade_notifications
-        (user_id, signal_key, direction, higher_timeframe_bias, detected_at, entry_time, exit_time,
+        (user_id, signal_key, strategy_version, direction, higher_timeframe_bias, detected_at, entry_time, exit_time,
          entry_price, stop_price, target_price, risk_usd, outcome, r_result)
-       VALUES ($1, $2, $3, $4, TO_TIMESTAMP($5), TO_TIMESTAMP($6), TO_TIMESTAMP($7),
-         $8, $9, $10, $11, $12, $13)
+       VALUES ($1, $2, $3, $4, $5, TO_TIMESTAMP($6), TO_TIMESTAMP($7), TO_TIMESTAMP($8),
+         $9, $10, $11, $12, $13, $14)
        ON CONFLICT (user_id, signal_key) DO UPDATE SET
          entry_time = EXCLUDED.entry_time,
          exit_time = EXCLUDED.exit_time,
@@ -53,7 +55,7 @@ export async function scanStrategy(userId: string) {
          outcome = EXCLUDED.outcome,
          r_result = EXCLUDED.r_result,
          updated_at = NOW()`,
-      [userId, setup.id, setup.direction, fifteenMinute.bias, setup.choch.time,
+      [userId, `${STRATEGY_VERSION}:${setup.id}`, STRATEGY_VERSION, setup.direction, fifteenMinute.bias, setup.choch.time,
         setup.entryTime ?? null, setup.exitTime ?? null, setup.midpoint, setup.stopPrice,
         setup.targetPrice, config.strategyRiskUsd, result.outcome, result.rResult],
     )

@@ -45,27 +45,27 @@ export function CandleChart({ candles, analysis, tradeSetups = [] }: CandleChart
       width: container.clientWidth,
       height: 510,
       layout: {
-        background: { type: ColorType.Solid, color: '#0e1118' },
-        textColor: '#7f8798',
+        background: { type: ColorType.Solid, color: '#131722' },
+        textColor: '#b2b5be',
         fontFamily: 'Inter, ui-sans-serif, system-ui',
       },
       grid: {
-        vertLines: { color: '#1b202a' },
-        horzLines: { color: '#1b202a' },
+        vertLines: { color: '#242832' },
+        horzLines: { color: '#242832' },
       },
       crosshair: {
         vertLine: { color: '#5f6b82', labelBackgroundColor: '#252b37' },
         horzLine: { color: '#5f6b82', labelBackgroundColor: '#252b37' },
       },
-      rightPriceScale: { borderColor: '#252b37', scaleMargins: { top: 0.08, bottom: 0.08 } },
-      timeScale: { borderColor: '#252b37', timeVisible: true, secondsVisible: false },
+      rightPriceScale: { borderColor: '#2a2e39', scaleMargins: { top: 0.08, bottom: 0.08 } },
+      timeScale: { borderColor: '#2a2e39', timeVisible: true, secondsVisible: false },
     })
     const series = chart.addSeries(CandlestickSeries, {
-      upColor: '#39d98a',
-      downColor: '#ff5c6c',
+      upColor: '#26a69a',
+      downColor: '#ef5350',
       borderVisible: false,
-      wickUpColor: '#39d98a',
-      wickDownColor: '#ff5c6c',
+      wickUpColor: '#26a69a',
+      wickDownColor: '#ef5350',
       priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
     })
     chartRef.current = chart
@@ -115,13 +115,13 @@ export function CandleChart({ candles, analysis, tradeSetups = [] }: CandleChart
       const points = recentSwings.filter((swing) => swing.type === type)
       for (let index = 1; index < points.length; index += 1) {
         const line = chart.addSeries(LineSeries, {
-          color: type === 'high' ? 'rgba(255, 92, 108, .55)' : 'rgba(57, 217, 138, .55)',
+          color: type === 'high' ? 'rgba(239, 83, 80, .72)' : 'rgba(41, 98, 255, .78)',
           lineWidth: 1,
           lineStyle: LineStyle.Dotted,
           lastValueVisible: false,
           priceLineVisible: false,
           crosshairMarkerVisible: false,
-          title: index === points.length - 1 ? (type === 'high' ? 'Swing-high trend' : 'Swing-low trend') : '',
+          title: index === points.length - 1 ? (type === 'high' ? 'Trend resistance' : 'Trend support') : '',
         })
         line.setData([
           { time: points[index - 1].time as Time, value: points[index - 1].price },
@@ -136,7 +136,7 @@ export function CandleChart({ candles, analysis, tradeSetups = [] }: CandleChart
       [...recentGaps, ...(activeSetup ? [activeSetup] : [])].map((gap) => [gap.id, gap]),
     ).values()].slice(-3)
     displayedGaps.forEach((gap) => {
-      const zoneColor = gap.direction === 'long' ? '57, 217, 138' : '255, 92, 108'
+      const zoneColor = gap.direction === 'long' ? '38, 166, 154' : '239, 83, 80'
       const zone = chart.addSeries(BaselineSeries, {
         baseValue: { type: 'price', price: gap.bottom },
         relativeGradient: true,
@@ -242,11 +242,27 @@ export function CandleChart({ candles, analysis, tradeSetups = [] }: CandleChart
     const displayedChoch = [...new Map(
       [...recentChoch, ...(activeSetup ? [activeSetup.choch] : [])].map((event) => [`${event.direction}-${event.time}`, event]),
     ).values()]
+    displayedChoch.forEach((event) => {
+      const breakLine = chart.addSeries(LineSeries, {
+        color: '#ff9800',
+        lineWidth: 2,
+        lineStyle: LineStyle.Dashed,
+        lastValueVisible: false,
+        priceLineVisible: false,
+        crosshairMarkerVisible: false,
+        title: `CHoCH ${event.direction === 'long' ? '↑' : '↓'}`,
+      })
+      breakLine.setData([
+        { time: event.brokenSwing.time as Time, value: event.brokenSwing.price },
+        { time: event.time as Time, value: event.brokenSwing.price },
+      ])
+      overlaySeriesRef.current.push(breakLine)
+    })
     markerPluginRef.current?.setMarkers(displayedChoch.map((event) => ({
       time: event.time as Time,
       position: event.direction === 'long' ? 'belowBar' as const : 'aboveBar' as const,
       shape: event.direction === 'long' ? 'arrowUp' as const : 'arrowDown' as const,
-      color: event.direction === 'long' ? '#39d98a' : '#ff5c6c',
+      color: '#ff9800',
       text: 'CHoCH',
     })))
   }, [analysis, tradeSetups])

@@ -90,6 +90,7 @@ export async function initializeDatabase() {
     ALTER TABLE trades ADD COLUMN IF NOT EXISTS source_notification_id BIGINT;
     CREATE UNIQUE INDEX IF NOT EXISTS trades_source_notification_unique
       ON trades(source_notification_id) WHERE source_notification_id IS NOT NULL;
+    ALTER TABLE trade_notifications ADD COLUMN IF NOT EXISTS strategy_version TEXT NOT NULL DEFAULT 'structure-v1';
   `)
 
   const passwordHash = await bcrypt.hash(config.adminPassword, 12)

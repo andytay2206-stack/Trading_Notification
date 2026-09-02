@@ -93,21 +93,24 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
       trend = inferred
       biasChanges.push({ time: candles[index].time, direction: inferred })
     }
-    const lastHigh = highs.at(-1)
-    const lastLow = lows.at(-1)
     const candle = candles[index]
     const previous = candles[index - 1]
+    const prior = candles[index - 2]
+    const bearishMove = previous.close < prior.close
+    const bullishMove = previous.close > prior.close
 
-    if (trend === 'short' && lastHigh && candle.close > lastHigh.price && previous.close <= lastHigh.price && lastHigh.index > lastBreakIndex) {
-      chochEvents.push({ time: candle.time, price: candle.close, index, direction: 'long', brokenSwing: lastHigh })
+    if (trend === 'short' && bearishMove && candle.close > previous.high && index - 1 > lastBreakIndex) {
+      const brokenCandle: SwingPoint = { time: previous.time, price: previous.high, index: index - 1, type: 'high' }
+      chochEvents.push({ time: candle.time, price: candle.close, index, direction: 'long', brokenSwing: brokenCandle })
       trend = 'long'
       biasChanges.push({ time: candle.time, direction: 'long' })
-      lastBreakIndex = lastHigh.index
-    } else if (trend === 'long' && lastLow && candle.close < lastLow.price && previous.close >= lastLow.price && lastLow.index > lastBreakIndex) {
-      chochEvents.push({ time: candle.time, price: candle.close, index, direction: 'short', brokenSwing: lastLow })
+      lastBreakIndex = index - 1
+    } else if (trend === 'long' && bullishMove && candle.close < previous.low && index - 1 > lastBreakIndex) {
+      const brokenCandle: SwingPoint = { time: previous.time, price: previous.low, index: index - 1, type: 'low' }
+      chochEvents.push({ time: candle.time, price: candle.close, index, direction: 'short', brokenSwing: brokenCandle })
       trend = 'short'
       biasChanges.push({ time: candle.time, direction: 'short' })
-      lastBreakIndex = lastLow.index
+      lastBreakIndex = index - 1
     }
   }
 
