@@ -20,6 +20,7 @@ interface CandleChartProps {
   candles: Candle[]
   analysis?: StructureAnalysis
   tradeSetups?: FairValueGap[]
+  setupQualification?: 'aligned' | 'candidate'
 }
 
 const chartCandle = (candle: Candle): CandlestickData<Time> => ({
@@ -30,7 +31,7 @@ const chartCandle = (candle: Candle): CandlestickData<Time> => ({
   close: candle.close,
 })
 
-export function CandleChart({ candles, analysis, tradeSetups = [] }: CandleChartProps) {
+export function CandleChart({ candles, analysis, tradeSetups = [], setupQualification = 'aligned' }: CandleChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
@@ -39,6 +40,7 @@ export function CandleChart({ candles, analysis, tradeSetups = [] }: CandleChart
   const firstTimeRef = useRef<number | null>(null)
   const followLatestRef = useRef(true)
   const [isFollowingLatest, setIsFollowingLatest] = useState(true)
+  const visibleSetup = tradeSetups.filter((setup) => setup.status === 'open' || setup.status === 'filled').at(-1)
 
   const showLatestCandles = () => {
     const chart = chartRef.current
@@ -143,7 +145,7 @@ export function CandleChart({ candles, analysis, tradeSetups = [] }: CandleChart
     overlaySeriesRef.current.forEach((series) => chart.removeSeries(series))
     overlaySeriesRef.current = []
 
-    const activeSetup = tradeSetups.filter((setup) => setup.status === 'open' || setup.status === 'filled').at(-1)
+    const activeSetup = visibleSetup
     const latestTime = candles.at(-1)?.time ?? 0
     const oneHourAgo = latestTime - 60 * 60
     const recentSwings = analysis.swings.slice(-8)
@@ -301,13 +303,18 @@ export function CandleChart({ candles, analysis, tradeSetups = [] }: CandleChart
       color: '#ff9800',
       text: 'CHoCH',
     })))
-  }, [analysis, tradeSetups])
+  }, [analysis, tradeSetups, visibleSetup])
 
   return (
     <div className="chart-wrap">
       <div className="chart-auto-label"><i />Automated strategy view</div>
       <div className="chart-navigation">
         <span>Wheel: zoom · Drag: move · Drag axes: scale · Double-click axes: reset</span>
+        {visibleSetup && (
+          <b className={`chart-setup-state ${setupQualification}`}>
+            {setupQualification === 'aligned' ? 'Aligned trade' : 'Possible trade'} · {visibleSetup.status === 'filled' ? 'active' : 'waiting'}
+          </b>
+        )}
         {!isFollowingLatest && <button type="button" onClick={showLatestCandles}>Latest candles</button>}
       </div>
       <div className="chart-canvas" ref={containerRef} />

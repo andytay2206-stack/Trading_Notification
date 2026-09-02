@@ -38,6 +38,8 @@ The CHoCH candle must also be the middle displacement candle of a three-candle p
 - Entry is the 50% midpoint between the two FVG boundaries.
 - Entry remains eligible for 120 one-minute candles.
 
+In the documented live example, 01:27 is the middle CHoCH/displacement candle; 01:26 and 01:28 provide the two non-overlapping wick boundaries.
+
 This is the current precise interpretation of the requested gap inside the CHoCH move. It can be adjusted if a different wick/body definition is intended.
 
 ## Risk and outcome
@@ -63,6 +65,8 @@ The scanner tracks every valid setup virtually. When it resolves:
 ## Chart display policy
 
 To keep the automated chart readable, only the newest setup whose FVG is waiting for entry or whose virtual trade is active receives entry, stop, target, and risk/reward shading. Resolved and expired trade levels are removed. The reward area is translucent green from entry to target; the risk area is translucent red from entry to stop.
+
+The chart can show the newest CHoCH+FVG setup before higher-timeframe approval. It labels this as **Possible trade**. When its timestamp-aligned 15-minute direction agrees, the label changes to **Aligned trade** and it is eligible for notification tracking.
 
 CHoCH is drawn as an orange dashed break line and marker. Up to three direction-colored FVG zones remain visible for the latest one-hour window. Compact labeled trend lines connect the latest swing highs and swing lows. An active setup remains visible even if its originating CHoCH has just moved outside that one-hour context window. Colors and annotation hierarchy follow TradingView's dark-chart conventions.
 

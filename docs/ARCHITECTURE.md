@@ -53,7 +53,7 @@ The chart is built with TradingView Lightweight Charts. Its strategy annotations
 - a red `−1R` stop;
 - a green `+4R` target.
 
-Only the newest waiting/active setup receives trade levels. Resolved trade overlays are removed automatically. Translucent green and red bands visualize reward and risk respectively. The chart retains orange structural-swing CHoCH break lines and up to three shaded FVGs from the latest hour, plus compact labeled swing-high and swing-low trend lines.
+Only the newest waiting/active setup receives trade levels. A counter-bias setup is visibly labeled **Possible trade**; a setup matching the timestamp-aligned 15-minute direction is labeled **Aligned trade** and can enter notification tracking. Resolved trade overlays are removed automatically. Translucent green and red bands visualize reward and risk respectively. The chart retains orange structural-swing CHoCH break lines and up to three shaded FVGs from the latest hour, plus compact labeled swing-high and swing-low trend lines.
 
 Pending signals carry a strategy version. `structure-v3` identifies the confirmed-structural-swing CHoCH rule; unresolved signals from older definitions are excluded from the current noticeboard, while user-decided history remains preserved.
 
