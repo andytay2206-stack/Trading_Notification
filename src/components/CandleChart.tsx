@@ -364,7 +364,6 @@ export function CandleChart({
       position: event.direction === 'long' ? 'belowBar' as const : 'aboveBar' as const,
       shape: event.direction === 'long' ? 'arrowUp' as const : 'arrowDown' as const,
       color: '#ff9800',
-      text: 'CHoCH',
     }))
     const recentBos = analysis.bosEvents.filter((event) => event.time >= oneHourAgo)
     const displayedBos = [...new Map(
@@ -376,14 +375,13 @@ export function CandleChart({
       position: event.direction === 'long' ? 'belowBar' as const : 'aboveBar' as const,
       shape: 'circle' as const,
       color: '#8b9cff',
-      text: 'BOS',
     }))
     const setupMarkers = visibleSetups.map((setup) => ({
       time: (setup.entryTime ?? setup.choch.time) as Time,
       position: setup.direction === 'long' ? 'belowBar' as const : 'aboveBar' as const,
       shape: 'square' as const,
       color: alignedSetupIdSet.has(setup.id) ? '#39d98a' : '#dfbb74',
-      text: `${setupTimeLabel(setup.choch.time)} ${setup.setupType === 'choch' ? 'CHoCH' : 'TREND'} ${setup.direction.toUpperCase()} · ${setup.status === 'filled' ? 'TRADE OPEN' : 'WAITING PULLBACK'}`,
+      text: `${setupTimeLabel(setup.choch.time)} ${setup.direction.toUpperCase()} · ${setup.status === 'filled' ? 'TRADE OPEN' : 'WAITING PULLBACK'}`,
     }))
     markerPluginRef.current?.setMarkers([...chochMarkers, ...bosMarkers, ...setupMarkers].sort((a, b) => Number(a.time) - Number(b.time)))
   }, [overlayRevision])
