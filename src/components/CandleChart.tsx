@@ -364,6 +364,7 @@ export function CandleChart({
       position: event.direction === 'long' ? 'belowBar' as const : 'aboveBar' as const,
       shape: event.direction === 'long' ? 'arrowUp' as const : 'arrowDown' as const,
       color: '#ff9800',
+      text: 'CHoCH',
     }))
     const recentBos = analysis.bosEvents.filter((event) => event.time >= oneHourAgo)
     const displayedBos = [...new Map(
@@ -375,6 +376,7 @@ export function CandleChart({
       position: event.direction === 'long' ? 'belowBar' as const : 'aboveBar' as const,
       shape: 'circle' as const,
       color: '#8b9cff',
+      text: 'BOS',
     }))
     const setupMarkers = visibleSetups.map((setup) => ({
       time: (setup.entryTime ?? setup.choch.time) as Time,
