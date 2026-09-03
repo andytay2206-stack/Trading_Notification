@@ -22,6 +22,19 @@ const isFinished = (notification: StrategyNotification) => ['win', 'loss', 'miss
 const historyTime = (value: string | null) => value
   ? new Date(value).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   : null
+const automaticStats = (notifications: StrategyNotification[], version: string) => {
+  const finished = notifications.filter((item) => item.strategy_version === version
+    && (item.outcome === 'win' || item.outcome === 'loss'))
+  const wins = finished.filter((item) => item.outcome === 'win').length
+  const losses = finished.length - wins
+  return {
+    wins,
+    losses,
+    winRate: finished.length ? (wins / finished.length) * 100 : 0,
+    netR: finished.reduce((total, item) => total + Number(item.r_result), 0),
+    pnlUsd: finished.reduce((total, item) => total + Number(item.risk_usd) * Number(item.r_result), 0),
+  }
+}
 
 export function Dashboard({ currency, onCurrencyChange, onOpenMarket }: DashboardProps) {
   const [trades, setTrades] = useState<Trade[]>([])
@@ -66,16 +79,8 @@ export function Dashboard({ currency, onCurrencyChange, onOpenMarket }: Dashboar
   const recentTrades = [...trades].sort((a, b) => (b.closedAt ?? b.openedAt).localeCompare(a.closedAt ?? a.openedAt)).slice(0, 5)
   const predictions = notifications.filter(isPrediction)
   const historyNotifications = notifications.filter(isFinished)
-  const strategyFinished = notifications.filter((item) => item.strategy_version === CURRENT_STRATEGY_VERSION
-    && (item.outcome === 'win' || item.outcome === 'loss'))
-  const strategyWins = strategyFinished.filter((item) => item.outcome === 'win').length
-  const strategyLosses = strategyFinished.length - strategyWins
-  const strategyWinRate = strategyFinished.length ? (strategyWins / strategyFinished.length) * 100 : 0
-  const strategyNetR = strategyFinished.reduce((total, item) => total + Number(item.r_result), 0)
-  const strategyPnlUsd = strategyFinished.reduce(
-    (total, item) => total + Number(item.risk_usd) * Number(item.r_result),
-    0,
-  )
+  const strategyStats = automaticStats(notifications, CURRENT_STRATEGY_VERSION)
+  const legacyStrategyStats = automaticStats(notifications, 'structure-v7')
 
   return (
     <main>
@@ -117,13 +122,17 @@ export function Dashboard({ currency, onCurrencyChange, onOpenMarket }: Dashboar
       <section className="metric-grid">
         <MetricCard eyebrow="Net profit" value={formatCurrency(performance.totalPnlUsd, currency)} detail={`${signedR(performance.totalR)} all time`} tone={performance.totalPnlUsd >= 0 ? 'positive' : 'negative'} featured />
         <article className="metric-card strategy-performance-card">
-          <div className="metric-eyebrow">Automatic strategy</div>
-          <div className={`metric-value ${strategyPnlUsd >= 0 ? 'positive' : 'negative'}`}>{strategyWinRate.toFixed(1)}%</div>
-          <div className="strategy-performance-values">
-            <span><small>Net R</small><b className={strategyNetR >= 0 ? 'positive' : 'negative'}>{signedR(strategyNetR)}</b></span>
-            <span><small>Profit / loss</small><b className={strategyPnlUsd >= 0 ? 'positive' : 'negative'}>{formatCurrency(strategyPnlUsd, currency)}</b></span>
+          <div className="legacy-strategy-summary">
+            <span><small>Previous strategy v7</small><b>{legacyStrategyStats.winRate.toFixed(1)}%</b></span>
+            <small>{legacyStrategyStats.wins} wins · {legacyStrategyStats.losses} losses · {signedR(legacyStrategyStats.netR)}</small>
           </div>
-          <div className="metric-detail">{strategyWins} wins · {strategyLosses} losses · automatic</div>
+          <div className="metric-eyebrow">Current automatic strategy · v8</div>
+          <div className={`metric-value ${strategyStats.pnlUsd >= 0 ? 'positive' : 'negative'}`}>{strategyStats.winRate.toFixed(1)}%</div>
+          <div className="strategy-performance-values">
+            <span><small>Net R</small><b className={strategyStats.netR >= 0 ? 'positive' : 'negative'}>{signedR(strategyStats.netR)}</b></span>
+            <span><small>Profit / loss</small><b className={strategyStats.pnlUsd >= 0 ? 'positive' : 'negative'}>{formatCurrency(strategyStats.pnlUsd, currency)}</b></span>
+          </div>
+          <div className="metric-detail">{strategyStats.wins} wins · {strategyStats.losses} losses · automatic</div>
         </article>
         <MetricCard eyebrow="Overall win rate" value={`${performance.overallWinRate.toFixed(1)}%`} detail={`${performance.wins} wins · ${performance.losses} losses · ${performance.cancellations} cancelled`} />
         <MetricCard eyebrow="Today's win rate" value={`${performance.todayWinRate.toFixed(1)}%`} detail={`${performance.todayTrades} closed today`} />

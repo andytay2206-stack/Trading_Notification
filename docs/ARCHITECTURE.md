@@ -81,6 +81,7 @@ The prediction is announced after CHoCH and FVG confirmation, and only a later c
 - **Net profit:** Sum of `pnlUsd` for closed trades. Other currencies are display conversions only.
 - **Strategy win rate:** All version-8 filled wins divided by filled wins plus losses, independent of user decisions; missed and cancelled predictions are excluded.
 - **Automatic strategy summary:** One dashboard card combines that win-rate percentage with the same completed setup set's net R and simulated currency P/L (`risk_usd × r_result`).
+- **Temporary v7 comparison:** A compact read-only v7 win-rate/record/net-R strip appears above the current v8 card. It does not alter or mix with v8 performance and can be removed after comparison.
 - **Overall win rate:** Accepted portfolio wins divided by wins plus losses; legacy cancellations and breakeven trades are excluded.
 - **Today's win rate:** The same calculation restricted to decisive trades closed today in the user's local timezone.
 - **R-multiple:** Profit or loss divided by planned initial risk. For example, risking USD 100 and earning USD 200 is `+2R`; losing the planned USD 100 is `-1R`.
