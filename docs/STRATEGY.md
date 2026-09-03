@@ -23,8 +23,9 @@ The two-candle confirmation means a pivot is known only after two later candles 
 
 ## Break of Structure (BOS) and trend lines
 
-- Bullish structure is low → high → higher low → higher high. The higher high passing the preceding high confirms bullish BOS. Its trend line connects the first low to the higher low.
-- Bearish structure is high → low → lower high → lower low. The lower low passing the preceding low confirms bearish BOS. Its trend line connects the first high to the lower high.
+- Bullish structure is low → high → higher low → higher high. The higher high passing the preceding high confirms bullish BOS. Its trend line connects the bottom-most confirmed low of the move to the later higher low.
+- Bearish structure is high → low → lower high → lower low. The lower low passing the preceding low confirms bearish BOS. Its trend line connects the top-most confirmed high of the move to the later lower high.
+- The chart shows only the latest confirmed bullish and latest confirmed bearish trend line for each timeframe, when available.
 - The 15-minute trend line is higher-timeframe direction context. The 1-minute trend line creates the actionable structure; counter-trend 1-minute setups remain possible because retracements can oppose the larger trend temporarily.
 - A BOS continuation searches the push from the second trend-line pivot through BOS for a matching FVG and predicts a return to its midpoint.
 

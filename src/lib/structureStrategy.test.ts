@@ -79,6 +79,24 @@ describe('market structure strategy', () => {
     expect(setup?.entryTime).toBe(data[6].time)
   })
 
+  it('anchors a bullish trend line at the bottom-most low instead of the nearest low', () => {
+    const data = [
+      candle(0, 10, 10.5, 9.8, 10),
+      candle(1, 10, 10.2, 9, 9.7),
+      candle(2, 10.5, 12, 10, 11.5),
+      candle(3, 10, 10.5, 9.5, 10),
+      candle(4, 10.5, 11.5, 10.2, 11),
+      candle(5, 10.5, 10.8, 10, 10.4),
+      candle(6, 10.5, 12.2, 10.5, 12),
+      candle(7, 12, 12.1, 11, 11.5),
+    ]
+    const analysis = analyzeStructure(data, { pivotLength: 1, stopBufferPercent: 5, rewardRisk: 4 })
+    const line = analysis.trendLines.find((item) => item.direction === 'long' && item.confirmedIndex === 6)
+
+    expect(line?.start).toMatchObject({ index: 1, price: 9 })
+    expect(line?.end).toMatchObject({ index: 5, price: 10 })
+  })
+
   it('keeps tracking a filled trade until the 4R target', () => {
     const analysis = analyzeStructure(bullishSequence, { pivotLength: 1, stopBufferPercent: 5, rewardRisk: 4 })
     const bullish = analysis.fairValueGaps.find((gap) => gap.direction === 'long')

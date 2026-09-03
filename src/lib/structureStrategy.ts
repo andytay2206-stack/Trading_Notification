@@ -184,7 +184,10 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
     const current = formationCandles[index]
 
     const higherLow = lows.at(-1)
-    const previousLow = lows.at(-2)
+    const previousLow = higherLow
+      ? lows.filter((low) => low.index < higherLow.index)
+        .reduce<SwingPoint | undefined>((lowest, low) => !lowest || low.price < lowest.price ? low : lowest, undefined)
+      : undefined
     const bullishBreak = higherLow && previousLow
       ? highs.filter((high) => high.index > previousLow.index && high.index < higherLow.index).at(-1)
       : undefined
@@ -205,7 +208,10 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
     }
 
     const lowerHigh = highs.at(-1)
-    const previousHigh = highs.at(-2)
+    const previousHigh = lowerHigh
+      ? highs.filter((high) => high.index < lowerHigh.index)
+        .reduce<SwingPoint | undefined>((highest, high) => !highest || high.price > highest.price ? high : highest, undefined)
+      : undefined
     const bearishBreak = lowerHigh && previousHigh
       ? lows.filter((low) => low.index > previousHigh.index && low.index < lowerHigh.index).at(-1)
       : undefined

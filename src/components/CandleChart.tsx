@@ -207,9 +207,12 @@ export function CandleChart({
 
     const latestTime = candles.at(-1)?.time ?? 0
     const oneHourAgo = latestTime - 60 * 60
+    const latestByDirection = (source: StructureAnalysis | undefined) => (['long', 'short'] as const)
+      .map((direction) => source?.trendLines.filter((line) => line.direction === direction).at(-1))
+      .filter((line): line is StructureAnalysis['trendLines'][number] => Boolean(line))
     const displayedTrendLines = [
-      ...analysis.trendLines.slice(-2).map((line) => ({ line, timeframe: '1m' as const })),
-      ...(higherTimeframeAnalysis?.trendLines.slice(-1).map((line) => ({ line, timeframe: '15m' as const })) ?? []),
+      ...latestByDirection(analysis).map((line) => ({ line, timeframe: '1m' as const })),
+      ...latestByDirection(higherTimeframeAnalysis).map((line) => ({ line, timeframe: '15m' as const })),
     ]
     displayedTrendLines.forEach(({ line: trendLine, timeframe }) => {
       const timeDistance = trendLine.end.time - trendLine.start.time
