@@ -10,7 +10,7 @@ Bybit public APIs ← bybit-api SDK ← Node API ← authenticated React client
                                  PostgreSQL
 ```
 
-The Node API loads the latest 300 `BTCUSDT` linear perpetual candles using `RestClientV5`. `WebsocketClient` subscribes to Bybit klines and bridges updates to the browser through server-sent events. A sequential 10-second REST poll provides a fallback when WebSocket access is restricted. Interval changes cancel and deactivate the prior feed before its callbacks can update the new view, preventing stale 15-minute responses from contaminating the 1-minute chart. The selected interval is persisted in browser storage so a remount does not silently return to 15 minutes.
+The Node API loads the latest 300 `BTCUSDT` linear perpetual candles using `RestClientV5`. `WebsocketClient` subscribes to Bybit klines and bridges updates to the browser through server-sent events. A sequential 10-second REST poll provides a fallback when WebSocket access is restricted. Interval changes cancel and deactivate the prior feed before its callbacks can update the new view, preventing stale 15-minute responses from contaminating the 1-minute chart. The selected interval is persisted in browser storage.
 
 ## Authentication
 
@@ -61,7 +61,9 @@ The one-at-a-time one-minute setup remains visible until its prediction is misse
 
 Live updates modify only new candle data. Strategy overlays rebuild only when structure or setup state changes, not for every mouse movement or price tick. Overlay removal/recreation is deferred during an active pointer gesture and resumed on pointer release, cancellation, or window blur; candle updates continue during the gesture. Both REST and WebSocket candles pass the same finite-value and OHLC-consistency validation before reaching Lightweight Charts. Drag-follow state changes are deduplicated, and a chart-local recovery boundary prevents a rendering failure from blanking the page.
 
-The structure engine retains internal trend lines for BOS, CHoCH, and setup decisions. The chart receives a separate stable display projection over its latest 180 candles: bullish support uses the departure after the window's lowest wick and the shallowest confirmed higher low; bearish resistance uses the highest wick and shallowest confirmed lower high. A CHoCH freezes the broken direction at the first post-break pivot. This separation keeps visual anchors readable without changing historical signal decisions.
+The structure engine retains internal trend lines for BOS, CHoCH, and setup decisions. The chart receives separate stable display projections: 300 loaded bars for one-minute structure and a rolling 240 bars for 15-minute structure. Bullish support uses the lowest wick and shallowest confirmed higher low; bearish resistance uses the highest wick and shallowest confirmed lower high. A minor one-minute line break caps the current cycle before a later confirmed cycle advances it. This separation keeps visual anchors readable without changing historical signal decisions.
+
+The market page owns one persistent Lightweight Charts instance. Changing the interval replaces that candlestick series' data and resets its interval identity; it does not mount a separate chart. The selected interval supplies the primary trend lines and markers. Fifteen-minute context is additionally overlaid only on the one-minute view, preventing duplicate or mislabeled one-minute lines on the 15-minute chart.
 
 Pending signals carry a strategy version and setup type. `structure-v8` adds BOS continuation, confirmed structural trend lines, and live-wick lifecycle evaluation. Older records remain available; unresolved version-7 trades are reconciled by both their legacy event timestamp and current detection timestamp and keep the single slot occupied before version-8 begins.
 

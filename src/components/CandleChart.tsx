@@ -14,12 +14,13 @@ import {
   type Time,
 } from 'lightweight-charts'
 import type { FairValueGap, StructureAnalysis } from '../lib/structureStrategy'
-import type { Candle } from '../types'
+import type { Candle, CandleInterval } from '../types'
 
 interface CandleChartProps {
   candles: Candle[]
   analysis?: StructureAnalysis
   higherTimeframeAnalysis?: StructureAnalysis
+  interval?: CandleInterval
   tradeSetups?: FairValueGap[]
   alignedSetupIds?: string[]
   showResolvedSetups?: boolean
@@ -43,6 +44,7 @@ export function CandleChart({
   candles,
   analysis,
   higherTimeframeAnalysis,
+  interval = '1',
   tradeSetups = [],
   alignedSetupIds,
   showResolvedSetups = false,
@@ -55,6 +57,7 @@ export function CandleChart({
   const markerPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
   const firstSeriesTimeRef = useRef<number | null>(null)
   const lastSeriesTimeRef = useRef<number | null>(null)
+  const seriesIntervalRef = useRef<CandleInterval | null>(null)
   const fittedSetupIdRef = useRef<string | null>(null)
   const followLatestRef = useRef(true)
   const interactionRef = useRef(false)
@@ -68,6 +71,7 @@ export function CandleChart({
   const overlayRevision = analysis ? [
     analysis.swings.map((swing) => `${swing.type}:${swing.time}:${swing.price}`).join(','),
     analysis.chochEvents.map((event) => `${event.direction}:${event.time}:${event.price}`).join(','),
+    analysis.displayChochEvents?.map((event) => `${event.direction}:${event.time}:${event.price}`).join(',') ?? '',
     analysis.bosEvents.map((event) => `${event.direction}:${event.time}:${event.price}`).join(','),
     (analysis.displayTrendLines ?? analysis.trendLines).map((line) => `${line.id}:${line.confirmedAt}`).join(','),
     analysis.fvgZones.map((gap) => gap.id).join(','),
@@ -77,6 +81,7 @@ export function CandleChart({
     visibleSetups.map((setup) => `${setup.id}:${setup.status}:${setup.entryTime ?? ''}:${setup.exitTime ?? ''}:${setup.endTime}`).join(','),
     [...alignedSetupIdSet].sort().join(','),
     String(showResolvedSetups),
+    interval,
     String(interactionEpoch),
   ].join('|') : ''
 
@@ -188,6 +193,7 @@ export function CandleChart({
       overlaySeriesRef.current = []
       firstSeriesTimeRef.current = null
       lastSeriesTimeRef.current = null
+      seriesIntervalRef.current = null
       fittedSetupIdRef.current = null
       followLatestRef.current = true
     }
@@ -203,7 +209,7 @@ export function CandleChart({
       ? -1
       : candles.findIndex((candle) => candle.time === lastSeriesTime)
 
-    if (firstSeriesTime === null || earliestCandle.time < firstSeriesTime
+    if (seriesIntervalRef.current !== interval || firstSeriesTime === null || earliestCandle.time < firstSeriesTime
       || lastSeriesTime === null || lastSeriesIndex === -1 || latestCandle.time < lastSeriesTime) {
       seriesRef.current.setData(candles.map(chartCandle))
       const focusIndex = focusTime === undefined
@@ -219,7 +225,8 @@ export function CandleChart({
     }
     firstSeriesTimeRef.current = earliestCandle.time
     lastSeriesTimeRef.current = latestCandle.time
-  }, [candles, focusTime])
+    seriesIntervalRef.current = interval
+  }, [candles, focusTime, interval])
 
   useEffect(() => {
     const chart = chartRef.current
@@ -237,21 +244,23 @@ export function CandleChart({
       .map((direction) => (source?.displayTrendLines ?? source?.trendLines)
         ?.filter((line) => line.direction === direction).at(-1))
       .filter((line): line is StructureAnalysis['trendLines'][number] => Boolean(line))
+    const intervalLabel = interval === 'D' ? '1D' : interval === '60' ? '1H' : interval === '240' ? '4H' : `${interval}m`
     const displayedTrendLines = [
-      ...latestByDirection(analysis).map((line) => ({ line, timeframe: '1m' as const })),
-      ...latestByDirection(higherTimeframeAnalysis).map((line) => ({ line, timeframe: '15m' as const })),
+      ...latestByDirection(analysis).map((line) => ({ line, timeframe: intervalLabel, higher: false })),
+      ...(interval === '1' ? latestByDirection(higherTimeframeAnalysis)
+        .map((line) => ({ line, timeframe: '15m', higher: true })) : []),
     ]
-    displayedTrendLines.forEach(({ line: trendLine, timeframe }) => {
+    displayedTrendLines.forEach(({ line: trendLine, timeframe, higher }) => {
       const timeDistance = trendLine.end.time - trendLine.start.time
       if (timeDistance <= 0 || latestTime <= trendLine.start.time) return
       const slope = (trendLine.end.price - trendLine.start.price) / timeDistance
       const projectedPrice = trendLine.start.price + slope * (latestTime - trendLine.start.time)
       const line = chart.addSeries(LineSeries, {
-        color: timeframe === '15m'
+        color: higher
           ? 'rgba(180, 135, 255, .88)'
           : trendLine.direction === 'long' ? 'rgba(41, 98, 255, .82)' : 'rgba(239, 83, 80, .78)',
-        lineWidth: timeframe === '15m' ? 3 : 2,
-        lineStyle: timeframe === '15m' ? LineStyle.Dashed : LineStyle.Solid,
+        lineWidth: higher ? 3 : 2,
+        lineStyle: higher ? LineStyle.Dashed : LineStyle.Solid,
         lastValueVisible: false,
         priceLineVisible: false,
         crosshairMarkerVisible: false,
@@ -387,7 +396,8 @@ export function CandleChart({
       fittedSetupIdRef.current = null
     }
 
-    const recentChoch = analysis.chochEvents.filter((event) => event.time >= oneHourAgo)
+    const recentChoch = [...analysis.chochEvents, ...(analysis.displayChochEvents ?? [])]
+      .filter((event) => event.time >= oneHourAgo)
     const displayedChoch = [...new Map(
       [...recentChoch, ...visibleSetups.filter((setup) => setup.setupType === 'choch').map((setup) => setup.choch)]
         .map((event) => [`${event.direction}-${event.time}`, event]),

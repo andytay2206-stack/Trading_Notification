@@ -45,7 +45,7 @@ export function Market() {
     const controller = new AbortController()
     let active = true
     let pollTimer: number | undefined
-    setCandles([])
+    let initialLoaded = false
     setError(null)
     setStatus('connecting')
 
@@ -53,6 +53,7 @@ export function Market() {
       .then((incoming) => {
         if (!active) return
         setCandles((current) => initial ? incoming : mergeCandles(current, incoming))
+        if (initial) initialLoaded = true
         setError(null)
         setLastUpdated(new Date())
         setStatus((current) => current === 'live' ? 'live' : 'polling')
@@ -65,12 +66,12 @@ export function Market() {
 
     const schedulePoll = () => {
       if (!active) return
-      pollTimer = window.setTimeout(() => void refresh().finally(schedulePoll), 10_000)
+      pollTimer = window.setTimeout(() => void refresh(!initialLoaded).finally(schedulePoll), 10_000)
     }
     void refresh(true).finally(schedulePoll)
 
     const unsubscribe = subscribeToCandles(interval, (incoming) => {
-      if (!active) return
+      if (!active || !initialLoaded) return
       setCandles((current) => {
         const last = current.at(-1)
         if (!last || incoming.time > last.time) return [...current, incoming].slice(-300)
@@ -137,7 +138,6 @@ export function Market() {
 
   const selectInterval = (nextInterval: CandleInterval) => {
     if (nextInterval === interval) return
-    setCandles([])
     setInterval(nextInterval)
     try {
       window.localStorage.setItem(MARKET_INTERVAL_KEY, nextInterval)
@@ -189,8 +189,8 @@ export function Market() {
           {error && candles.length === 0
             ? <div className="chart-error"><b>Market data unavailable</b><span>{error}. Check the connection and retry.</span><button type="button" className="secondary-button" onClick={() => setReloadKey((key) => key + 1)}>Retry feed</button></div>
             : candles.length ? (
-              <ChartErrorBoundary key={`${interval}-${reloadKey}`} onReset={() => setReloadKey((key) => key + 1)}>
-                <CandleChart candles={candles} analysis={analysis} higherTimeframeAnalysis={fifteenMinuteAnalysis} tradeSetups={chartSetups} alignedSetupIds={alignedSetupIds} />
+              <ChartErrorBoundary key={reloadKey} onReset={() => setReloadKey((key) => key + 1)}>
+                <CandleChart candles={candles} analysis={analysis} higherTimeframeAnalysis={fifteenMinuteAnalysis} interval={interval} tradeSetups={chartSetups} alignedSetupIds={alignedSetupIds} />
               </ChartErrorBoundary>
             ) : <div className="chart-loading"><i /><span>Loading Bybit candles…</span></div>}
         </div>

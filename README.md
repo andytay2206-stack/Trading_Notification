@@ -13,7 +13,7 @@ Northstar is a notification-first futures monitor. A React interface talks to a 
 - Net result measured in `R`, where `1R` is the initial amount risked
 - Recent trade outcome journal
 - Live `BTCUSDT` linear perpetual candlestick chart from Bybit
-- Candle intervals: 1m, 3m, 5m, 15m, 30m, 1h, 4h, and 1d
+- One persistent interactive chart with switchable 1m, 3m, 5m, 15m, 30m, 1h, 4h, and 1d candles
 - Real-time updates to the open candle through Bybit WebSocket data
 - Responsive desktop and mobile layouts
 - Persistent sidebar navigation with Overview, Live Market, and Backtesting pages

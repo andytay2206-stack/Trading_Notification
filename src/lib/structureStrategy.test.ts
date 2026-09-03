@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Candle } from '../types'
-import { alignedOneMinuteSetups, analyzeStructure, findDisplayTrendLines, findFairValueGaps, findSwingPoints, oneSetupAtATime } from './structureStrategy'
+import { alignedOneMinuteSetups, analyzeStructure, findDisplayChochEvents, findDisplayTrendLines, findFairValueGaps, findSwingPoints, oneSetupAtATime } from './structureStrategy'
 
 const candle = (index: number, open: number, high: number, low: number, close: number): Candle => ({
   time: 1_700_000_000 + index * 60,
@@ -42,7 +42,7 @@ describe('market structure strategy', () => {
     ]))
   })
 
-  it('derives stable 180-candle display trend anchors and freezes the broken line', () => {
+  it('derives wick-based display anchors and advances to the shallowest confirmed trend point', () => {
     const data = Array.from({ length: 180 }, (_, index) => candle(index, 100, 101, 99, 100))
     data[10] = candle(10, 92, 93, 90, 92)
     data[11] = candle(11, 92, 94, 91, 93)
@@ -51,12 +51,44 @@ describe('market structure strategy', () => {
     data[158] = candle(158, 96, 97, 95, 96)
     data[162] = candle(162, 113, 114, 112, 113)
     const swings = findSwingPoints(data, 1)
-    const lines = findDisplayTrendLines(data, swings, { direction: 'long', index: 136 } as never)
+    const lines = findDisplayTrendLines(data, swings, 180)
 
     expect(lines.find((line) => line.direction === 'long'))
-      .toMatchObject({ start: { index: 11, price: 91 }, end: { index: 158, price: 95 } })
+      .toMatchObject({ start: { index: 10, price: 90 }, end: { index: 158, price: 95 } })
     expect(lines.find((line) => line.direction === 'short'))
-      .toMatchObject({ start: { index: 100, price: 120 }, end: { index: 137, price: 115 } })
+      .toMatchObject({ start: { index: 100, price: 120 }, end: { index: 162, price: 114 } })
+  })
+
+  it('marks a later minor CHoCH when a closed candle breaks the adjusted resistance', () => {
+    const data = Array.from({ length: 16 }, (_, index) => candle(index, 105, 106, 104, 105))
+    data[1] = candle(1, 119, 120, 118, 119)
+    data[4] = candle(4, 114, 115, 113, 114)
+    data[8] = candle(8, 110, 111, 109, 110)
+    data[12] = candle(12, 113, 114, 112, 113.8)
+    data[13] = candle(13, 113.8, 114.2, 112.5, 114)
+    const swings = findSwingPoints(data, 1)
+    const primary = [{ direction: 'long', index: 7 }] as never
+
+    expect(findDisplayChochEvents(data, swings, primary, 16)).toEqual([
+      expect.objectContaining({ direction: 'long', index: 12 }),
+    ])
+  })
+
+  it('retains the reviewed bearish and bullish three-candle wick gaps', () => {
+    const data = [
+      candle(0, 78038.2, 78044.8, 78007.3, 78022.9),
+      candle(1, 78022.9, 78034.2, 77985.7, 77992),
+      candle(2, 77992, 77992, 77858.5, 77865.4),
+      candle(3, 77807.3, 77863.4, 77806.7, 77848),
+      candle(4, 77848, 77913.8, 77847.9, 77909.4),
+      candle(5, 77909.4, 77952.4, 77909.4, 77952),
+    ]
+    const gaps = findFairValueGaps(data)
+
+    expect(gaps.find((gap) => gap.middleIndex === 1))
+      .toMatchObject({ direction: 'short', top: 78007.3, bottom: 77992, midpoint: 77999.65 })
+    expect(gaps.find((gap) => gap.middleIndex === 4))
+      .toMatchObject({ direction: 'long', top: 77909.4, bottom: 77863.4, midpoint: 77886.4 })
   })
 
   it('only aligns one-minute gaps with the fifteen-minute bias', () => {

@@ -71,6 +71,7 @@ export interface StructureAnalysis {
   bosEvents: BosEvent[]
   trendLines: TrendLine[]
   displayTrendLines?: TrendLine[]
+  displayChochEvents?: Array<Pick<ChochEvent, 'time' | 'price' | 'index' | 'direction'>>
   fvgZones: FvgZone[]
   fairValueGaps: FairValueGap[]
   biasChanges: Array<{ time: number; direction: TradeSide }>
@@ -142,10 +143,14 @@ export function findFairValueGaps(candles: Candle[]): FvgZone[] {
 export function findDisplayTrendLines(
   candles: Candle[],
   swings: SwingPoint[],
-  latestChoch?: ChochEvent,
-  windowSize = 180,
+  windowSize?: number,
+  latestMinorChoch?: Pick<ChochEvent, 'index' | 'direction'>,
 ): TrendLine[] {
-  const windowStart = Math.max(0, candles.length - windowSize)
+  const candleDuration = candles.length > 1 ? candles[1].time - candles[0].time : 60
+  // One-minute structure needs the full chart history, while 15-minute context
+  // uses roughly 2.5 days so old, unrelated cycle extremes roll away.
+  const resolvedWindowSize = windowSize ?? (candleDuration >= 15 * 60 ? 240 : 300)
+  const windowStart = Math.max(0, candles.length - resolvedWindowSize)
   const firstLiveIndex = candles.findIndex((candle) => candle.confirmed === false)
   const endExclusive = firstLiveIndex === -1 ? candles.length : firstLiveIndex
   if (endExclusive - windowStart < 3) return []
@@ -159,11 +164,10 @@ export function findDisplayTrendLines(
   ), 0)
   const lowestIndex = windowStart + lowestOffset
   const highestIndex = windowStart + highestOffset
-  const departureIndex = Math.min(lowestIndex + 1, endExclusive - 1)
   const bullishStart: SwingPoint = {
-    time: candles[departureIndex].time,
-    price: candles[departureIndex].low,
-    index: departureIndex,
+    time: candles[lowestIndex].time,
+    price: candles[lowestIndex].low,
+    index: lowestIndex,
     type: 'low',
   }
   const bearishStart: SwingPoint = {
@@ -173,14 +177,15 @@ export function findDisplayTrendLines(
     type: 'high',
   }
   const confirmedSwings = swings.filter((swing) => swing.index >= windowStart && swing.index < endExclusive)
-  const bullishEndLimit = latestChoch?.direction === 'short' ? latestChoch.index + 1 : endExclusive - 1
-  const bearishEndLimit = latestChoch?.direction === 'long' ? latestChoch.index + 1 : endExclusive - 1
+  const endLimit = candleDuration < 15 * 60 && latestMinorChoch
+    ? latestMinorChoch.index
+    : endExclusive - 1
   const bullishEnd = confirmedSwings.filter((swing) => swing.type === 'low'
-    && swing.index > bullishStart.index && swing.index <= bullishEndLimit && swing.price > bullishStart.price)
+    && swing.index > bullishStart.index && swing.index <= endLimit && swing.price > bullishStart.price)
     .map((swing) => ({ swing, slope: (swing.price - bullishStart.price) / (swing.index - bullishStart.index) }))
     .sort((a, b) => a.slope - b.slope || b.swing.index - a.swing.index)[0]?.swing
   const bearishEnd = confirmedSwings.filter((swing) => swing.type === 'high'
-    && swing.index > bearishStart.index && swing.index <= bearishEndLimit && swing.price < bearishStart.price)
+    && swing.index > bearishStart.index && swing.index <= endLimit && swing.price < bearishStart.price)
     .map((swing) => ({ swing, slope: (swing.price - bearishStart.price) / (swing.index - bearishStart.index) }))
     .sort((a, b) => b.slope - a.slope || b.swing.index - a.swing.index)[0]?.swing
 
@@ -202,6 +207,66 @@ export function findDisplayTrendLines(
       confirmedIndex: Math.min(bearishEnd.index + 1, endExclusive - 1),
     }] : []),
   ]
+}
+
+export function findDisplayChochEvents(
+  candles: Candle[],
+  swings: SwingPoint[],
+  primaryEvents: ChochEvent[],
+  windowSize?: number,
+): Array<Pick<ChochEvent, 'time' | 'price' | 'index' | 'direction'>> {
+  const latestPrimary = primaryEvents.at(-1)
+  if (!latestPrimary || candles.length < 3) return []
+  const candleDuration = candles.length > 1 ? candles[1].time - candles[0].time : 60
+  const resolvedWindowSize = windowSize ?? (candleDuration >= 15 * 60 ? 240 : 300)
+  const windowStart = Math.max(0, candles.length - resolvedWindowSize)
+  const firstLiveIndex = candles.findIndex((candle) => candle.confirmed === false)
+  const endExclusive = firstLiveIndex === -1 ? candles.length : firstLiveIndex
+  const windowCandles = candles.slice(windowStart, endExclusive)
+  if (windowCandles.length < 3) return []
+
+  const breakingLong = latestPrimary.direction === 'long'
+  const startOffset = windowCandles.reduce((selected, item, index) => {
+    if (breakingLong) return item.high > windowCandles[selected].high ? index : selected
+    return item.low < windowCandles[selected].low ? index : selected
+  }, 0)
+  const startIndex = windowStart + startOffset
+  const start: SwingPoint = {
+    time: candles[startIndex].time,
+    price: breakingLong ? candles[startIndex].high : candles[startIndex].low,
+    index: startIndex,
+    type: breakingLong ? 'high' : 'low',
+  }
+  const candidates = swings.filter((swing) => swing.type === start.type
+    && swing.index > latestPrimary.index && swing.index > start.index && swing.index < endExclusive
+    && (breakingLong ? swing.price < start.price : swing.price > start.price))
+  let end = candidates[0]
+  if (!end) return []
+
+  const minimumBreak = 0.01 / 100
+  for (let index = end.index + 1; index < endExclusive; index += 1) {
+    const knownCandidates = candidates.filter((candidate) => candidate.index < index)
+    const shallowest = knownCandidates.map((candidate) => ({
+      candidate,
+      slope: (candidate.price - start.price) / (candidate.index - start.index),
+    })).sort((a, b) => breakingLong
+      ? b.slope - a.slope || b.candidate.index - a.candidate.index
+      : a.slope - b.slope || b.candidate.index - a.candidate.index)[0]?.candidate
+    if (shallowest) end = shallowest
+    if (index <= end.index + 1) continue
+    const projected = start.price
+      + ((end.price - start.price) / (end.index - start.index)) * (index - start.index)
+    const broken = breakingLong
+      ? candles[index].close > projected * (1 + minimumBreak)
+      : candles[index].close < projected * (1 - minimumBreak)
+    if (broken) return [{
+      time: candles[index].time,
+      price: candles[index].close,
+      index,
+      direction: breakingLong ? 'long' : 'short',
+    }]
+  }
+  return []
 }
 
 export function analyzeStructure(candles: Candle[], settings = defaultStructureSettings): StructureAnalysis {
@@ -507,10 +572,11 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
   })
 
   const bias = chronologicalBiasChanges.at(-1)?.direction ?? 'neutral'
-  const displayTrendLines = findDisplayTrendLines(candles, swings, chochEvents.at(-1))
+  const displayChochEvents = findDisplayChochEvents(candles, swings, chochEvents)
+  const displayTrendLines = findDisplayTrendLines(candles, swings, undefined, displayChochEvents.at(-1))
 
   return {
-    swings, chochEvents, bosEvents, trendLines, displayTrendLines, fvgZones, fairValueGaps,
+    swings, chochEvents, bosEvents, trendLines, displayTrendLines, displayChochEvents, fvgZones, fairValueGaps,
     biasChanges: chronologicalBiasChanges, bias,
   }
 }
