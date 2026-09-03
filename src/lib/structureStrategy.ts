@@ -152,7 +152,9 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
   const anchors = new Map<TradeSide, SwingPoint>()
   const anchorEstablishedAt = new Map<TradeSide, number>()
   const biasChanges: Array<{ time: number; direction: TradeSide }> = []
+  const latestLineByDirection = new Map<TradeSide, TrendLine>()
   let activeTrendLine: TrendLine | undefined
+  let structuralBias: TradeSide | 'neutral' = 'neutral'
   const minimumBreakPercent = 0.005
 
   const extremeBefore = (type: SwingPoint['type'], fromIndex: number, toIndex: number): SwingPoint => {
@@ -206,26 +208,33 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
         }
         chochEvents.push(event)
         biasChanges.push({ time: event.time, direction })
+        structuralBias = direction
         const anchorType = direction === 'long' ? 'low' : 'high'
         anchors.set(direction, extremeBefore(anchorType, activeTrendLine.start.index, index))
         anchorEstablishedAt.set(direction, index)
+        latestLineByDirection.delete(direction)
         activeTrendLine = undefined
         continue
       }
     }
 
     const higherLow = latestLow
-    const previousLow = anchors.get('long') ?? (higherLow
-      ? lows.filter((low) => low.index < higherLow.index)
+    const bullishAnchorIndex = anchorEstablishedAt.get('long')
+    const structuralLow = higherLow
+      ? lows.filter((low) => low.index < higherLow.index
+        && (bullishAnchorIndex === undefined || low.index > bullishAnchorIndex))
         .reduce<SwingPoint | undefined>((lowest, low) => !lowest || low.price < lowest.price ? low : lowest, undefined)
-      : undefined)
+      : undefined
+    const anchoredLow = anchors.get('long')
+    const previousLow = !anchoredLow || (structuralLow && structuralLow.price < anchoredLow.price)
+      ? structuralLow
+      : anchoredLow
     const bullishBreak = higherLow && previousLow
       ? highs.filter((high) => high.index > Math.max(previousLow.index, anchorEstablishedAt.get('long') ?? -1)
         && high.index < higherLow.index)
         .reduce<SwingPoint | undefined>((highest, high) => !highest || high.price > highest.price ? high : highest, undefined)
       : undefined
     if (previousLow && higherLow && bullishBreak
-      && (!activeTrendLine || activeTrendLine.direction === 'long')
       && bullishBreak.index > previousLow.index
       && higherLow.price > previousLow.price
       && current.high > bullishBreak.price * (1 + minimumBreakPercent / 100)
@@ -244,31 +253,41 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
         confirmedAt: current.time, confirmedIndex: index,
       }
       bosEvents.push(event)
-      biasChanges.push({ time: event.time, direction: 'long' })
-      anchors.set('long', previousLow)
+      const latestLongLine = latestLineByDirection.get('long')
       const candidateSlope = (trendLine.end.price - trendLine.start.price) / (trendLine.end.index - trendLine.start.index)
-      const activeSlope = activeTrendLine
-        ? (activeTrendLine.end.price - activeTrendLine.start.price) / (activeTrendLine.end.index - activeTrendLine.start.index)
+      const activeSlope = latestLongLine
+        ? (latestLongLine.end.price - latestLongLine.start.price) / (latestLongLine.end.index - latestLongLine.start.index)
         : Number.POSITIVE_INFINITY
-      if (!activeTrendLine || candidateSlope < activeSlope) {
+      if (!latestLongLine || candidateSlope < activeSlope) {
         trendLines.push(trendLine)
-        activeTrendLine = trendLine
+        latestLineByDirection.set('long', trendLine)
+      }
+      if (structuralBias === 'neutral' || structuralBias === 'long') {
+        if (structuralBias === 'neutral') biasChanges.push({ time: event.time, direction: 'long' })
+        structuralBias = 'long'
+        anchors.set('long', previousLow)
+        activeTrendLine = latestLineByDirection.get('long')
       }
       brokenBullishHighs.add(bullishBreak.index)
     }
 
     const lowerHigh = latestHigh
-    const previousHigh = anchors.get('short') ?? (lowerHigh
-      ? highs.filter((high) => high.index < lowerHigh.index)
+    const bearishAnchorIndex = anchorEstablishedAt.get('short')
+    const structuralHigh = lowerHigh
+      ? highs.filter((high) => high.index < lowerHigh.index
+        && (bearishAnchorIndex === undefined || high.index > bearishAnchorIndex))
         .reduce<SwingPoint | undefined>((highest, high) => !highest || high.price > highest.price ? high : highest, undefined)
-      : undefined)
+      : undefined
+    const anchoredHigh = anchors.get('short')
+    const previousHigh = !anchoredHigh || (structuralHigh && structuralHigh.price > anchoredHigh.price)
+      ? structuralHigh
+      : anchoredHigh
     const bearishBreak = lowerHigh && previousHigh
       ? lows.filter((low) => low.index > Math.max(previousHigh.index, anchorEstablishedAt.get('short') ?? -1)
         && low.index < lowerHigh.index)
         .reduce<SwingPoint | undefined>((lowest, low) => !lowest || low.price < lowest.price ? low : lowest, undefined)
       : undefined
     if (previousHigh && lowerHigh && bearishBreak
-      && (!activeTrendLine || activeTrendLine.direction === 'short')
       && bearishBreak.index > previousHigh.index
       && lowerHigh.price < previousHigh.price
       && current.low < bearishBreak.price * (1 - minimumBreakPercent / 100)
@@ -287,15 +306,20 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
         confirmedAt: current.time, confirmedIndex: index,
       }
       bosEvents.push(event)
-      biasChanges.push({ time: event.time, direction: 'short' })
-      anchors.set('short', previousHigh)
+      const latestShortLine = latestLineByDirection.get('short')
       const candidateSlope = (trendLine.end.price - trendLine.start.price) / (trendLine.end.index - trendLine.start.index)
-      const activeSlope = activeTrendLine
-        ? (activeTrendLine.end.price - activeTrendLine.start.price) / (activeTrendLine.end.index - activeTrendLine.start.index)
+      const activeSlope = latestShortLine
+        ? (latestShortLine.end.price - latestShortLine.start.price) / (latestShortLine.end.index - latestShortLine.start.index)
         : Number.POSITIVE_INFINITY
-      if (!activeTrendLine || candidateSlope < activeSlope) {
+      if (!latestShortLine || candidateSlope < activeSlope) {
         trendLines.push(trendLine)
-        activeTrendLine = trendLine
+        latestLineByDirection.set('short', trendLine)
+      }
+      if (structuralBias === 'neutral' || structuralBias === 'short') {
+        if (structuralBias === 'neutral') biasChanges.push({ time: event.time, direction: 'short' })
+        structuralBias = 'short'
+        anchors.set('short', previousHigh)
+        activeTrendLine = latestLineByDirection.get('short')
       }
       brokenBearishLows.add(bearishBreak.index)
     }

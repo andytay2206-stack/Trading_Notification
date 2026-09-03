@@ -65,6 +65,8 @@ Pending signals carry a strategy version and setup type. `structure-v8` adds BOS
 
 The chart, server scanner, notification outcomes, and backtester all consume the same strategy implementation.
 
+The structure engine keeps primary bias separate from directional BOS observations. CHoCH changes primary bias. Same-bias BOS advances its active trend line, while an opposite-direction BOS can still publish a countertrend Strategy 1 setup without replacing that primary line. CHoCH is therefore tested against the correct primary boundary rather than whichever minor BOS happened most recently.
+
 In production, an in-process Railway worker scans all application users sequentially every 60 seconds. The next cycle is scheduled only after the current cycle finishes, so a slow Bybit response cannot stack worker cycles. A per-user in-flight lock also makes a simultaneous dashboard refresh share the active scan instead of duplicating it. Browser-triggered scans remain available for an immediate refresh but are no longer required for lifecycle tracking. Vercel serves the frontend and reverse-proxies same-origin `/api/*` traffic to the Railway service.
 
 ## Notification decisions

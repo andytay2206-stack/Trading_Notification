@@ -232,6 +232,44 @@ describe('market structure strategy', () => {
       .toMatchObject({ start: { index: 60, price: 77820 }, end: { index: 74, price: 77690 } })
   })
 
+  it('matches the reviewed 07:15-07:41 BOS and CHoCH sequence', () => {
+    const replay: Array<[number, number, number, number]> = [
+      [77836.9, 78124.8, 77836.9, 78104.9], // 07:04
+      [78104.9, 78149, 78067, 78148.4], [78148.4, 78148.4, 78035, 78062.3],
+      [78062.3, 78065.5, 77973, 78032.6], [78032.6, 78047.9, 77980, 77983.9],
+      [77983.9, 78016, 77980, 77980], [77980, 77998.2, 77945.9, 77980.1],
+      [77980.1, 78062, 77972, 78056.8], [78056.8, 78093.2, 78042.9, 78064],
+      [78064, 78074.1, 78041, 78049.8], [78049.8, 78055, 78041, 78041],
+      [78041, 78041.1, 77936.5, 77940], // 07:15 BOS
+      [77940, 77959.5, 77913.4, 77913.5], [77913.5, 77947.7, 77913.4, 77913.4],
+      [77913.4, 77925, 77908.5, 77911.6], [77911.6, 77950, 77901.1, 77931],
+      [77931, 77931, 77891, 77894.7], // 07:20 continuation, not CHoCH
+      [77894.7, 77928.5, 77885, 77928.4], [77928.4, 77997.8, 77928.4, 77979.4],
+      [77979.4, 77992.4, 77942.9, 77985.4], [77985.4, 77985.9, 77923.2, 77929.7],
+      [77929.7, 77938.2, 77873, 77873], // 07:25 BOS
+      [77873, 77883.9, 77855, 77883.9], [77883.9, 77915.9, 77876.3, 77913.7],
+      [77913.7, 77955.4, 77903.3, 77955.4], [77955.4, 77955.4, 77910.8, 77910.8],
+      [77910.8, 77915, 77833.3, 77833.4], [77833.4, 77841.3, 77827, 77838.5],
+      [77838.5, 77873.6, 77815.5, 77873.6], [77873.6, 77900, 77861.9, 77895.6],
+      [77895.6, 77900, 77860, 77889.8], [77889.8, 77900, 77872.4, 77880.1],
+      [77880.1, 77900, 77862.3, 77862.3], [77862.3, 77900, 77862.3, 77900],
+      [77900, 77900, 77870.4, 77900], [77900, 77950, 77900, 77950],
+      [77950, 77964.2, 77935.9, 77964.1],
+      [77964.1, 78038.3, 77964.1, 78038.2], // 07:41 CHoCH
+      [78038.2, 78044.8, 78007.3, 78022.9],
+    ]
+    const data = replay.map(([open, high, low, close], index) => candle(index, open, high, low, close))
+    const analysis = analyzeStructure(data, { pivotLength: 1, stopBufferPercent: 8, rewardRisk: 4 })
+    const bosIndices = analysis.bosEvents.map((event) => event.index)
+    const chochIndices = analysis.chochEvents.map((event) => event.index)
+
+    expect(bosIndices).toEqual(expect.arrayContaining([11, 21]))
+    expect(chochIndices).not.toContain(16)
+    expect(chochIndices).toContain(37)
+    expect(analysis.trendLines.find((line) => line.confirmedIndex === 11 && line.direction === 'short'))
+      .toMatchObject({ start: { index: 1, price: 78149 }, end: { index: 9, price: 78074.1 } })
+  })
+
   it('keeps tracking a filled trade until the 4R target', () => {
     const analysis = analyzeStructure(bullishSequence, { pivotLength: 1, stopBufferPercent: 5, rewardRisk: 4 })
     const bullish = analysis.fairValueGaps.find((gap) => gap.direction === 'long')

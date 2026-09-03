@@ -29,6 +29,7 @@ The one-candle confirmation means a pivot is known after the next candle closes.
 - When later BOS events offer another line from the same CHoCH anchor, the engine retains the lower projected boundary: the shallower bullish support or steeper bearish resistance. This preserves the reviewed bullish line from the 05:28 low to the 05:47 reversal instead of replacing it with the steeper internal 05:54 low.
 - The chart shows only the latest confirmed bullish and latest confirmed bearish trend line for each timeframe, when available.
 - The 15-minute trend line is higher-timeframe direction context. The 1-minute trend line creates the actionable structure; counter-trend 1-minute setups remain possible because retracements can oppose the larger trend temporarily.
+- Primary one-minute direction changes only at CHoCH. A complete BOS in the opposite direction remains a valid countertrend structure and may produce Strategy 1, but it does not replace the primary trend line. A BOS matching the current primary direction updates its trend line. This keeps the bullish 07:03 continuation available while allowing the bearish 07:15 BOS after the 06:11 bearish CHoCH to control subsequent CHoCH detection.
 - Strategy 1 is the trend-line bounce/BOS continuation. It first prefers the three-candle displacement FVG whose first candle is the BOS candle and whose middle candle follows the break. The prediction is published only when the third candle closes and finalizes that gap. If this immediate post-BOS gap does not exist, the engine falls back to the most relevant established FVG in the structural push.
 
 ## Change of Character (CHoCH)
@@ -39,6 +40,7 @@ The one-candle confirmation means a pivot is known after the next candle closes.
 - A bullish CHoCH seeds its next bullish trend line from the lowest wick before the break. A bearish CHoCH seeds its next bearish line from the highest wick before the break. New BOS structure must form after the CHoCH before that seeded anchor can publish another setup.
 - The latest confirmed opposing swing before CHoCH is the stop's invalidation extreme. Its wick supplies the lowest point for a bullish setup or highest point for a bearish setup.
 - Pivots and lower-low/higher-high comparisons use candle wicks; CHoCH additionally requires the confirming candle to close through the projected trend line.
+- The reviewed sequence confirms bearish BOS at 07:15 and 07:25. Because the 07:15 BOS establishes the active bearish line, the continuing lower low at 07:20 is not another CHoCH. The later 07:41 higher-high reversal closes through that bearish line and is bullish CHoCH.
 
 ## Fair Value Gap (FVG)
 
