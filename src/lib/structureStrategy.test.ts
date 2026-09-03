@@ -137,6 +137,37 @@ describe('market structure strategy', () => {
     expect(gap.midpoint).toBeCloseTo(77684.8)
   })
 
+  it('detects the finalized 07:03/07:04/07:05 bullish wick gap', () => {
+    const data = [
+      candle(0, 77829.5, 77869.4, 77824, 77836.9),
+      candle(1, 77836.9, 78124.8, 77836.9, 78104.9),
+      candle(2, 78104.9, 78149, 78067, 78148.4),
+    ]
+    const gap = findFairValueGaps(data)[0]
+
+    expect(gap).toMatchObject({ direction: 'long', middleIndex: 1, bottom: 77869.4, top: 78067 })
+    expect(gap.midpoint).toBeCloseTo(77968.2)
+  })
+
+  it('prefers the displacement FVG finalized after a Strategy 1 BOS', () => {
+    const data = [
+      candle(0, 10, 10.5, 9.8, 10),
+      candle(1, 10, 10.2, 9, 9.6),
+      candle(2, 10.6, 12, 10.5, 11.7),
+      candle(3, 11, 11, 10, 10.7),
+      candle(4, 10.7, 12.5, 10.8, 12.2),
+      candle(5, 12.2, 15, 12.2, 14.8),
+      candle(6, 14.8, 15.5, 14, 15),
+      candle(7, 15, 15.2, 13, 14),
+    ]
+    const setup = analyzeStructure(data, { pivotLength: 1, stopBufferPercent: 8, rewardRisk: 4 })
+      .fairValueGaps.find((gap) => gap.setupType === 'trend-continuation' && gap.choch.index === 4)
+
+    expect(setup).toMatchObject({ middleIndex: 5, bottom: 12.5, top: 14, midpoint: 13.25 })
+    expect(setup?.detectedIndex).toBe(6)
+    expect(setup?.entryTime).toBe(data[7].time)
+  })
+
   it('matches the reviewed 05:00-06:13 market-structure sequence', () => {
     const replay: Array<[number, number, number, number]> = [
       [77749.7, 77792, 77743.2, 77792], [77792, 77792, 77753.6, 77753.6],

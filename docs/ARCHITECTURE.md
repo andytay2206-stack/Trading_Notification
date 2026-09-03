@@ -43,6 +43,8 @@ Trade lifecycle → win rate / net R / USD profit / drawdown
 
 The backtest and live scanner share the same deterministic strategy module. Each 1-minute setup records only the 15-minute bias known at that timestamp, preventing look-ahead bias. Bias is contextual rather than a separate scheduling filter, so the chart and server share one chronological slot. If both stop and target fall inside the same candle, the stop is assumed to occur first.
 
+For Strategy 1 continuation, a BOS may precede its preferred FVG: the BOS candle is the first candle, the following displacement is the middle candle, and the next closed candle finalizes the gap. Detection time is therefore the later of the structural event and complete FVG, and lifecycle evaluation starts on the next candle. This keeps the signal causal while allowing the post-break displacement gap to outrank a smaller pre-break gap.
+
 ## Automated strategy chart
 
 The chart is built with TradingView Lightweight Charts. Its strategy annotations are automated, while the view supports cursor and touch navigation. Mouse-wheel or pinch gestures zoom, dragging moves through candle history, dragging either axis changes its scale, and double-clicking an axis resets it. Live updates stop forcing the chart back to real time after the user navigates away; **Latest candles** restores the live view. It renders:

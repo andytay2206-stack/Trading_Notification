@@ -29,7 +29,7 @@ The one-candle confirmation means a pivot is known after the next candle closes.
 - When later BOS events offer another line from the same CHoCH anchor, the engine retains the lower projected boundary: the shallower bullish support or steeper bearish resistance. This preserves the reviewed bullish line from the 05:28 low to the 05:47 reversal instead of replacing it with the steeper internal 05:54 low.
 - The chart shows only the latest confirmed bullish and latest confirmed bearish trend line for each timeframe, when available.
 - The 15-minute trend line is higher-timeframe direction context. The 1-minute trend line creates the actionable structure; counter-trend 1-minute setups remain possible because retracements can oppose the larger trend temporarily.
-- A BOS continuation searches the push from the second trend-line pivot through BOS for a matching FVG and predicts a return to its midpoint.
+- Strategy 1 is the trend-line bounce/BOS continuation. It first prefers the three-candle displacement FVG whose first candle is the BOS candle and whose middle candle follows the break. The prediction is published only when the third candle closes and finalizes that gap. If this immediate post-BOS gap does not exist, the engine falls back to the most relevant established FVG in the structural push.
 
 ## Change of Character (CHoCH)
 
@@ -55,6 +55,8 @@ The structural leg from the invalidation swing through BOS or CHoCH must contain
 In the 06:39 long example, the preferred established FVG is 06:34/06:35/06:36. Its boundaries are 77,490.6 and 77,500.0, giving a midpoint entry of 77,495.3. The 06:34 invalidation wick is 77,408.3 and the buffered stop is 77,404.2. The earlier 01:27 example remains valid when no earlier established FVG exists and the CHoCH candle itself is the middle displacement candle.
 
 In the reviewed 03:33/03:34/03:35 bearish example, the outer wicks leave a gap from 77,677.0 to 77,692.6, whose exact midpoint is 77,684.8 (the visually estimated 77,684.3). It remains a valid contextual FVG even if an older active trade prevents a second pullback prediction.
+
+In the reviewed Strategy 1 example, the 07:03 BOS candle, 07:04 displacement candle, and 07:05 third candle leave a bullish FVG from 77,869.4 to 78,067.0. Its midpoint is 77,968.2 (the visually estimated 77,967.8). The setup becomes knowable at 07:05, and the later 07:10 wick fills the midpoint entry.
 
 This is the current precise interpretation of the requested gap inside the CHoCH move. It can be adjusted if a different wick/body definition is intended.
 

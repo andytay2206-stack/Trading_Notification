@@ -107,7 +107,7 @@ export function Dashboard({ currency, onCurrencyChange, onOpenMarket }: Dashboar
               <article className="notification-card" key={notification.id}>
                 <div className={`notification-side ${notification.direction}`}>{notification.direction}</div>
                 <div className="notification-main">
-                  <b>BTCUSDT · {notification.setup_type === 'trend-continuation' ? 'Trend continuation' : 'CHoCH reversal'} · {notification.outcome === 'active' ? 'Entry filled' : 'Waiting for pullback'}</b>
+                  <b>BTCUSDT · {notification.setup_type === 'trend-continuation' ? 'Strategy 1 · Trend-line bounce' : 'Strategy 2 · CHoCH reversal'} · {notification.outcome === 'active' ? 'Entry filled' : 'Waiting for pullback'}</b>
                   <span>{new Date(notification.detected_at).toLocaleString()} · 15m {notification.higher_timeframe_bias}</span>
                 </div>
                 <div className="notification-level"><small>Entry</small><b>{Number(notification.entry_price).toFixed(1)}</b></div>
@@ -199,7 +199,7 @@ export function Dashboard({ currency, onCurrencyChange, onOpenMarket }: Dashboar
               const exitTime = historyTime(item.exit_time)
               return (
                 <div className="trade-row signal-row" key={item.id}>
-                  <span><b>BTCUSDT</b><small>{item.setup_type === 'trend-continuation' ? 'Trend continuation' : 'CHoCH'} · {new Date(item.detected_at).toLocaleString()}</small></span>
+                  <span><b>BTCUSDT</b><small>{item.setup_type === 'trend-continuation' ? 'Strategy 1 · Trend-line bounce' : 'Strategy 2 · CHoCH'} · {new Date(item.detected_at).toLocaleString()}</small></span>
                   <span className={item.direction}>{item.direction}</span>
                   <span>{item.outcome}</span>
                   <span>{entryTime

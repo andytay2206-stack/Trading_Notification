@@ -315,8 +315,16 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
     // the dominant displacement zone and avoids selecting tiny later gaps.
     const candidates = fvgZones.filter((gap) => gap.direction === choch.direction
       && gap.middleIndex > choch.invalidationSwing.index && gap.middleIndex <= choch.index)
+    // Strategy 1 is confirmed by BOS, followed by the displacement candle and
+    // the third candle that finalizes its wick gap. Prefer that causal
+    // post-BOS gap over smaller imbalances that existed before the break.
+    const continuationPush = setupType === 'trend-continuation'
+      ? fvgZones.filter((gap) => gap.direction === choch.direction && gap.middleIndex === choch.index + 1)
+      : []
     const establishedBeforeChoch = candidates.filter((candidate) => candidate.middleIndex < choch.index - 1)
-    const relevantCandidates = establishedBeforeChoch.length > 0 ? establishedBeforeChoch : candidates
+    const relevantCandidates = continuationPush.length > 0
+      ? continuationPush
+      : establishedBeforeChoch.length > 0 ? establishedBeforeChoch : candidates
     const selected = relevantCandidates.sort((a, b) => (b.top - b.bottom) - (a.top - a.bottom)
       || b.middleIndex - a.middleIndex)[0]
     if (!selected) return []
