@@ -12,6 +12,7 @@ export interface BacktestConfig {
 
 export interface BacktestTrade {
   id: string
+  setupType: 'choch' | 'trend-continuation'
   side: 'long' | 'short'
   entryTime: number
   exitTime: number
@@ -57,6 +58,7 @@ export function runStructureBacktest(
       const rMultiple = setup.rResult ?? (won ? config.rewardRisk : -1)
       return {
         id: setup.id,
+        setupType: setup.setupType,
         side: setup.direction,
         entryTime: setup.entryTime!,
         exitTime: setup.exitTime!,

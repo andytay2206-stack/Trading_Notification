@@ -49,7 +49,10 @@ export async function fetchCandles(interval: CandleInterval, signal?: AbortSigna
     close: Number(close),
     volume: Number(volume),
     confirmed: Number(time) / 1000 + intervalSeconds(interval) <= Date.now() / 1000,
-  })).reverse()
+  })).filter((candle) => [candle.time, candle.open, candle.high, candle.low, candle.close, candle.volume].every(Number.isFinite)
+    && candle.high >= Math.max(candle.open, candle.close, candle.low)
+    && candle.low <= Math.min(candle.open, candle.close, candle.high))
+    .reverse()
 }
 
 export async function fetchCandleRange(

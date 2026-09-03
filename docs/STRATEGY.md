@@ -7,7 +7,7 @@ This document is the executable interpretation currently shared by the automated
 - `BTCUSDT` Bybit linear perpetual only.
 - The 15-minute chart supplies directional context and alignment status.
 - The 1-minute chart generates entries.
-- Only closed candles participate in structure and signal decisions.
+- Only closed candles create pivots, BOS, CHoCH, FVGs, or new predictions. Once a prediction exists, the live candle's current wick can fill entry or hit TP/SL immediately without waiting for close.
 - Every setup stores the 15-minute bias already known at its timestamp. Future bias is never applied retroactively, but an opposing bias no longer hides or independently schedules a second trade.
 
 ## Swing structure
@@ -21,6 +21,13 @@ A swing uses a two-candle pivot by default:
 
 The two-candle confirmation means a pivot is known only after two later candles have closed.
 
+## Break of Structure (BOS) and trend lines
+
+- Bullish structure is low → high → higher low → higher high. The higher high passing the preceding high confirms bullish BOS. Its trend line connects the first low to the higher low.
+- Bearish structure is high → low → lower high → lower low. The lower low passing the preceding low confirms bearish BOS. Its trend line connects the first high to the lower high.
+- The 15-minute trend line is higher-timeframe direction context. The 1-minute trend line creates the actionable structure; counter-trend 1-minute setups remain possible because retracements can oppose the larger trend temporarily.
+- A BOS continuation searches the push from the second trend-line pivot through BOS for a matching FVG and predicts a return to its midpoint.
+
 ## Change of Character (CHoCH)
 
 - Swing structure first establishes whether the move is upward or downward.
@@ -31,13 +38,13 @@ The two-candle confirmation means a pivot is known only after two later candles 
 
 ## Fair Value Gap (FVG)
 
-The structural leg from the invalidation swing through the CHoCH must contain a three-candle imbalance. CHoCH without an FVG in that move does not create an entry:
+The structural leg from the invalidation swing through BOS or CHoCH must contain a three-candle wick imbalance. A structural event without an FVG does not create an entry:
 
 - Bullish FVG: the following candle's low is above the preceding candle's high.
 - Bearish FVG: the following candle's high is below the preceding candle's low.
 - An FVG established at least one full closed candle before CHoCH is preferred. If several qualify, the widest gap is the most relevant displacement zone and a tie uses the nearest gap. If none was already established, a valid CHoCH-centered FVG may be used after its third candle closes.
 - The 50% midpoint between the two FVG boundaries becomes a predicted entry line only after both CHoCH and the complete three-candle FVG are confirmed.
-- Entry occurs only when a later one-minute candle returns to and touches that midpoint. A candle used to form the CHoCH or FVG can never retroactively fill the trade.
+- Entry occurs only when a later one-minute candle returns to and touches that midpoint. A candle used to form the structural event or FVG can never retroactively fill the trade; a still-forming later candle can fill it from its wick.
 - No newer setup is considered while the selected setup is waiting for entry or active after entry.
 
 In the 06:39 long example, the preferred established FVG is 06:34/06:35/06:36. Its boundaries are 77,490.6 and 77,500.0, giving a midpoint entry of 77,495.3. The 06:34 invalidation wick is 77,408.3 and the buffered stop is 77,404.2. The earlier 01:27 example remains valid when no earlier established FVG exists and the CHoCH candle itself is the middle displacement candle.
@@ -67,7 +74,7 @@ The notification board contains only waiting pullback predictions and active ent
 - Check means the user took the trade; the result enters portfolio statistics and history.
 - Cross means the user did not take the trade; it remains in signal history but does not affect portfolio statistics.
 - The automatic strategy win rate counts the result even when neither button is used. Check/Cross affects only the personal portfolio statistics.
-- Version-7 waiting predictions that expire are shown in history as cancelled at `0R`; they do not affect strategy or portfolio win rate.
+- Version-8 waiting predictions that expire are shown in history as cancelled at `0R`; they do not affect strategy or portfolio win rate. Unresolved version-7 setups are reconciled before a new version-8 slot can start.
 
 ## Chart display policy
 
@@ -77,14 +84,14 @@ When a prediction first appears, the price scale fits its FVG and entry. Once en
 
 The setup receives a time-stamped candle tag. A short tag sits above its entry or CHoCH candle; a long tag sits below it.
 
-CHoCH is drawn as an orange dashed break line and marker. Three recent softly shaded, direction-colored FVG zones remain visible for context, along with the selected setup if its originating CHoCH has moved outside the one-hour window. Compact labeled trend lines connect the latest swing highs and swing lows. Colors and annotation hierarchy follow TradingView's dark-chart conventions.
+CHoCH is drawn as an orange dashed break line and marker; BOS uses a violet break marker. Confirmed 1-minute trend lines connect the structural lows or highs and the latest 15-minute line is overlaid in violet as higher-timeframe context. Three recent softly shaded FVG zones remain visible alongside the selected setup. Colors and annotation hierarchy follow TradingView's dark-chart conventions.
 
 The automated indicators do not prevent chart navigation. Use the mouse wheel to zoom, drag the chart to move through candle history, drag the time or price axis to rescale, and double-click an axis to reset it. Navigating away pauses automatic real-time following; **Latest candles** returns to the live edge.
 
 ## Known limitations
 
 - Fees, funding, spread, and slippage are excluded.
-- The scanner currently runs when the dashboard requests a scan; an always-on background worker is still planned.
+- Railway runs the scanner in a sequential 60-second background loop; the browser also supports a manual scan.
 - A maximum of 1,000 one-minute candles is evaluated per scan due to the upstream endpoint limit.
 - Each backtest randomly selects a historical endpoint between two days and two years ago, then loads the chosen 500, 800, or 1,000-candle sample plus a 12-hour structural warm-up.
 - Strategy behavior should be reviewed visually against known examples before being treated as production trading guidance.

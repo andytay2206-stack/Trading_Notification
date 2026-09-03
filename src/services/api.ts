@@ -63,6 +63,7 @@ export interface StrategyNotification {
   id: string
   signal_key: string
   strategy_version: string
+  setup_type: 'choch' | 'trend-continuation'
   direction: 'long' | 'short'
   higher_timeframe_bias: 'long' | 'short' | 'neutral'
   detected_at: string

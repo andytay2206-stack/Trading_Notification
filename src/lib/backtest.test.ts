@@ -19,19 +19,20 @@ const candles = (seconds: number, start = 1_700_000_000): Candle[] => values.map
 }))
 
 describe('runStructureBacktest', () => {
-  it('scores aligned CHoCH/FVG trades in R and USD', () => {
+  it('scores the earliest valid structural FVG trade in R and USD', () => {
     const result = runStructureBacktest(candles(60), candles(900, 1_699_985_000), config)
     expect(result.trades).toHaveLength(1)
-    expect(result.wins).toBe(1)
-    expect(result.netR).toBe(4)
-    expect(result.netProfitUsd).toBe(400)
-    expect(result.winRate).toBe(100)
+    expect(result.trades[0].setupType).toBe('trend-continuation')
+    expect(result.losses).toBe(1)
+    expect(result.netR).toBe(-1)
+    expect(result.netProfitUsd).toBe(-100)
+    expect(result.winRate).toBe(0)
   })
 
   it('tracks the one-minute setup when higher-timeframe bias is unavailable', () => {
     const result = runStructureBacktest(candles(60), candles(900).slice(0, 2), config)
     expect(result.trades).toHaveLength(1)
-    expect(result.netR).toBe(4)
+    expect(result.netR).toBe(-1)
   })
 
   it('only scores setups detected inside the selected historical window', () => {

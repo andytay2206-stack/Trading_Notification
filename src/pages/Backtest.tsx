@@ -23,6 +23,7 @@ const initialConfig: BacktestConfig = {
 export function Backtest() {
   const [config, setConfig] = useState(initialConfig)
   const [candles, setCandles] = useState<Candle[]>([])
+  const [higherTimeframeCandles, setHigherTimeframeCandles] = useState<Candle[]>([])
   const [windowStart, setWindowStart] = useState<number | null>(null)
   const [windowEnd, setWindowEnd] = useState<number | null>(null)
   const [result, setResult] = useState<BacktestResult | null>(null)
@@ -49,6 +50,7 @@ export function Backtest() {
       await saveBacktestRun(runConfig, backtestResult, selectedCandles)
       setConfig(runConfig)
       setCandles(historicalCandles)
+      setHigherTimeframeCandles(biasCandles)
       setWindowStart(start / 1000)
       setWindowEnd(end / 1000)
       setResult(backtestResult)
@@ -61,6 +63,7 @@ export function Backtest() {
   }
 
   const chartAnalysis = useMemo(() => analyzeStructure(candles), [candles])
+  const higherTimeframeAnalysis = useMemo(() => analyzeStructure(higherTimeframeCandles), [higherTimeframeCandles])
   const chartSetups = useMemo(
     () => oneSetupAtATime(chartAnalysis.fairValueGaps)
       .filter((setup) => setup.choch.time >= (windowStart ?? Number.NEGATIVE_INFINITY)
@@ -85,7 +88,7 @@ export function Backtest() {
         <span className="pill">BTCUSDT · Bybit</span>
       </section>
 
-      <div className="demo-banner"><span>Structure strategy</span> 15m directional bias · 1m CHoCH · dominant three-candle FVG midpoint entry · 5% candle-range stop buffer · 4R target.</div>
+      <div className="demo-banner"><span>Structure strategy v8</span> 15m directional context · 1m BOS trend continuation or CHoCH reversal · wick-defined FVG midpoint entry · 5% candle-range stop buffer · 4R target.</div>
 
       <section className="backtest-layout">
         <aside className="panel backtest-controls">
@@ -142,6 +145,7 @@ export function Backtest() {
                   key={selectedTradeId ?? 'backtest'}
                   candles={candles}
                   analysis={chartAnalysis}
+                  higherTimeframeAnalysis={higherTimeframeAnalysis}
                   tradeSetups={selectedSetup ? [selectedSetup] : []}
                   showResolvedSetups
                   focusTime={selectedSetup?.entryTime ?? selectedSetup?.choch.time}
@@ -163,7 +167,7 @@ export function Backtest() {
                         onClick={() => setSelectedTradeId(trade.id)}
                         onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setSelectedTradeId(trade.id) }}
                       >
-                        <span className={trade.side}>{trade.side}</span>
+                        <span className={trade.side}>{trade.side}<small>{trade.setupType === 'trend-continuation' ? 'BOS trend' : 'CHoCH'}</small></span>
                         <span>{new Date(trade.entryTime * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                         <span>{new Date(trade.exitTime * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                         <span>{trade.exitReason}</span>

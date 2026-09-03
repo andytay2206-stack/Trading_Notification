@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CandleChart } from '../components/CandleChart'
+import { ChartErrorBoundary } from '../components/ChartErrorBoundary'
 import { fetchCandles, subscribeToCandles } from '../services/bybit'
 import { getStrategyState } from '../services/api'
 import { alignedOneMinuteSetups, analyzeStructure, oneSetupAtATime } from '../lib/structureStrategy'
@@ -111,12 +112,8 @@ export function Market() {
   const latest = candles.at(-1)
   const previous = candles.at(-2)
   const change = useMemo(() => latest && previous ? ((latest.close - previous.close) / previous.close) * 100 : 0, [latest, previous])
-  const confirmedCandles = useMemo(() => candles.filter((candle) => candle.confirmed), [candles])
-  const confirmedSignature = confirmedCandles
-    .map((candle) => `${candle.time}:${candle.open}:${candle.high}:${candle.low}:${candle.close}`)
-    .join('|')
-  const analysis = useMemo(() => analyzeStructure(confirmedCandles), [confirmedSignature])
-  const fifteenMinuteAnalysis = useMemo(() => analyzeStructure(fifteenMinuteCandles.filter((candle) => candle.confirmed)), [fifteenMinuteCandles])
+  const analysis = useMemo(() => analyzeStructure(candles), [candles])
+  const fifteenMinuteAnalysis = useMemo(() => analyzeStructure(fifteenMinuteCandles), [fifteenMinuteCandles])
   const alignedSetups = useMemo(
     () => interval === '1' && strategyStartedAt !== null
       ? oneSetupAtATime(alignedOneMinuteSetups(analysis, fifteenMinuteAnalysis)
@@ -183,14 +180,19 @@ export function Market() {
             <span className="last-update">{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : 'Waiting for data'}</span>
           </div>
           <div className="indicator-legend">
-            <span><i className="trend-up" />Swing structure</span>
+            <span><i className="trend-up" />Confirmed trend line</span>
+            <span><i className="bos-dot" />BOS</span>
             <span><i className="choch-dot" />CHoCH</span>
             <span><i className="fvg-line" />Fair value gap</span>
             <b className={fifteenMinuteAnalysis.bias === 'long' ? 'positive' : fifteenMinuteAnalysis.bias === 'short' ? 'negative' : ''}>15m bias: {fifteenMinuteAnalysis.bias}</b>
           </div>
           {error && candles.length === 0
             ? <div className="chart-error"><b>Market data unavailable</b><span>{error}. Check the connection and retry.</span><button type="button" className="secondary-button" onClick={() => setReloadKey((key) => key + 1)}>Retry feed</button></div>
-            : candles.length ? <CandleChart key={interval} candles={candles} analysis={analysis} tradeSetups={chartSetups} alignedSetupIds={alignedSetupIds} /> : <div className="chart-loading"><i /><span>Loading Bybit candles…</span></div>}
+            : candles.length ? (
+              <ChartErrorBoundary key={`${interval}-${reloadKey}`} onReset={() => setReloadKey((key) => key + 1)}>
+                <CandleChart candles={candles} analysis={analysis} higherTimeframeAnalysis={fifteenMinuteAnalysis} tradeSetups={chartSetups} alignedSetupIds={alignedSetupIds} />
+              </ChartErrorBoundary>
+            ) : <div className="chart-loading"><i /><span>Loading Bybit candles…</span></div>}
         </div>
 
         <aside className="trade-rail">
@@ -198,10 +200,10 @@ export function Market() {
             <div className="signal-heading"><span className="radar-icon">⌁</span><span className="pill">{chartSetups.length ? (chartSetupIsAligned ? 'Aligned setup' : 'Possible setup') : 'Strategy pending'}</span></div>
             <div className="overline">Signal monitor</div>
             <h2>Watching the market</h2>
-            <p>Tracking structural CHoCH and fair value gap pullbacks. A 1-minute setup is valid only when aligned with the 15-minute bias.</p>
+            <p>Tracking BOS trend bounces and CHoCH reversals into fair value gap pullbacks. The 15-minute structure is context; the 1-minute structure creates the setup.</p>
             <div className="strategy-direction"><span>15m direction</span><b className={fifteenMinuteAnalysis.bias === 'long' ? 'positive' : fifteenMinuteAnalysis.bias === 'short' ? 'negative' : ''}>{fifteenMinuteAnalysis.bias}</b></div>
             <div className="strategy-direction"><span>Selected 1m setup</span><b className={chartSetupIsAligned ? 'positive' : chartSetups.length ? 'warning' : ''}>{chartSetups.length ? (chartSetupIsAligned ? 'Aligned' : 'Possible') : 'None'}</b></div>
-            <div className="strategy-direction"><span>Aligned 1m FVGs</span><b>{interval === '1' ? alignedSetups.length : 'Select 1m'}</b></div>
+            <div className="strategy-direction"><span>15m-aligned setups</span><b>{interval === '1' ? alignedSetups.length : 'Select 1m'}</b></div>
           </article>
 
           <article className="panel market-details">

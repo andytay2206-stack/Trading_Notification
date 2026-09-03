@@ -19,6 +19,7 @@ import type { Candle } from '../types'
 interface CandleChartProps {
   candles: Candle[]
   analysis?: StructureAnalysis
+  higherTimeframeAnalysis?: StructureAnalysis
   tradeSetups?: FairValueGap[]
   alignedSetupIds?: string[]
   showResolvedSetups?: boolean
@@ -41,6 +42,7 @@ const setupTimeLabel = (time: number) => new Date(time * 1000).toLocaleTimeStrin
 export function CandleChart({
   candles,
   analysis,
+  higherTimeframeAnalysis,
   tradeSetups = [],
   alignedSetupIds,
   showResolvedSetups = false,
@@ -61,6 +63,17 @@ export function CandleChart({
     : tradeSetups.filter((setup) => setup.status === 'open' || setup.status === 'filled')
   const alignedSetupIdSet = new Set(alignedSetupIds ?? visibleSetups.map((setup) => setup.id))
   const primarySetup = visibleSetups.at(-1)
+  const overlayRevision = analysis ? [
+    analysis.swings.map((swing) => `${swing.type}:${swing.time}:${swing.price}`).join(','),
+    analysis.chochEvents.map((event) => `${event.direction}:${event.time}:${event.price}`).join(','),
+    analysis.bosEvents.map((event) => `${event.direction}:${event.time}:${event.price}`).join(','),
+    analysis.trendLines.map((line) => `${line.id}:${line.confirmedAt}`).join(','),
+    higherTimeframeAnalysis?.trendLines.map((line) => `15m:${line.id}:${line.confirmedAt}`).join(',') ?? '',
+    analysis.fairValueGaps.map((gap) => `${gap.id}:${gap.status}:${gap.entryTime ?? ''}:${gap.exitTime ?? ''}:${gap.endTime}`).join(','),
+    visibleSetups.map((setup) => `${setup.id}:${setup.status}:${setup.entryTime ?? ''}:${setup.exitTime ?? ''}:${setup.endTime}`).join(','),
+    [...alignedSetupIdSet].sort().join(','),
+    String(showResolvedSetups),
+  ].join('|') : ''
 
   const showLatestCandles = () => {
     const chart = chartRef.current
@@ -128,16 +141,22 @@ export function CandleChart({
     markerPluginRef.current = createSeriesMarkers(series, [])
 
     const handleVisibleRangeChange = () => {
-      const followingLatest = chart.timeScale().scrollPosition() <= 0
+      const scrollPosition = chart.timeScale().scrollPosition()
+      const followingLatest = Number.isFinite(scrollPosition) && scrollPosition <= 0
+      if (followLatestRef.current === followingLatest) return
       followLatestRef.current = followingLatest
       setIsFollowingLatest(followingLatest)
     }
     chart.timeScale().subscribeVisibleLogicalRangeChange(handleVisibleRangeChange)
 
-    const observer = new ResizeObserver(() => chart.applyOptions({ width: container.clientWidth }))
+    let disposed = false
+    const observer = new ResizeObserver(() => {
+      if (!disposed && container.clientWidth > 0) chart.applyOptions({ width: container.clientWidth })
+    })
     observer.observe(container)
 
     return () => {
+      disposed = true
       observer.disconnect()
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(handleVisibleRangeChange)
       chart.remove()
@@ -188,25 +207,32 @@ export function CandleChart({
 
     const latestTime = candles.at(-1)?.time ?? 0
     const oneHourAgo = latestTime - 60 * 60
-    const recentSwings = analysis.swings.slice(-8)
-    ;(['high', 'low'] as const).forEach((type) => {
-      const points = recentSwings.filter((swing) => swing.type === type)
-      for (let index = 1; index < points.length; index += 1) {
-        const line = chart.addSeries(LineSeries, {
-          color: type === 'high' ? 'rgba(239, 83, 80, .72)' : 'rgba(41, 98, 255, .78)',
-          lineWidth: 1,
-          lineStyle: LineStyle.Dotted,
-          lastValueVisible: false,
-          priceLineVisible: false,
-          crosshairMarkerVisible: false,
-          title: index === points.length - 1 ? (type === 'high' ? 'Trend resistance' : 'Trend support') : '',
-        })
-        line.setData([
-          { time: points[index - 1].time as Time, value: points[index - 1].price },
-          { time: points[index].time as Time, value: points[index].price },
-        ])
-        overlaySeriesRef.current.push(line)
-      }
+    const displayedTrendLines = [
+      ...analysis.trendLines.slice(-2).map((line) => ({ line, timeframe: '1m' as const })),
+      ...(higherTimeframeAnalysis?.trendLines.slice(-1).map((line) => ({ line, timeframe: '15m' as const })) ?? []),
+    ]
+    displayedTrendLines.forEach(({ line: trendLine, timeframe }) => {
+      const timeDistance = trendLine.end.time - trendLine.start.time
+      if (timeDistance <= 0 || latestTime <= trendLine.start.time) return
+      const slope = (trendLine.end.price - trendLine.start.price) / timeDistance
+      const projectedPrice = trendLine.start.price + slope * (latestTime - trendLine.start.time)
+      const line = chart.addSeries(LineSeries, {
+        color: timeframe === '15m'
+          ? 'rgba(180, 135, 255, .88)'
+          : trendLine.direction === 'long' ? 'rgba(41, 98, 255, .82)' : 'rgba(239, 83, 80, .78)',
+        lineWidth: timeframe === '15m' ? 3 : 2,
+        lineStyle: timeframe === '15m' ? LineStyle.Dashed : LineStyle.Solid,
+        lastValueVisible: false,
+        priceLineVisible: false,
+        crosshairMarkerVisible: false,
+        autoscaleInfoProvider: () => null,
+        title: `${timeframe} ${trendLine.direction === 'long' ? 'bull' : 'bear'} trend`,
+      })
+      line.setData([
+        { time: trendLine.start.time as Time, value: trendLine.start.price },
+        { time: latestTime as Time, value: projectedPrice },
+      ])
+      overlaySeriesRef.current.push(line)
     })
 
     const recentGaps = analysis.fairValueGaps.filter((gap) => gap.choch.time >= oneHourAgo).slice(-3)
@@ -300,6 +326,7 @@ export function CandleChart({
         lastValueVisible: false,
         priceLineVisible: false,
         crosshairMarkerVisible: false,
+        autoscaleInfoProvider: () => null,
       })
       levelHost.setData([
         { time: bandStart, value: activeSetup.midpoint },
@@ -329,7 +356,8 @@ export function CandleChart({
 
     const recentChoch = analysis.chochEvents.filter((event) => event.time >= oneHourAgo)
     const displayedChoch = [...new Map(
-      [...recentChoch, ...visibleSetups.map((setup) => setup.choch)].map((event) => [`${event.direction}-${event.time}`, event]),
+      [...recentChoch, ...visibleSetups.filter((setup) => setup.setupType === 'choch').map((setup) => setup.choch)]
+        .map((event) => [`${event.direction}-${event.time}`, event]),
     ).values()]
     displayedChoch.forEach((event) => {
       const breakLine = chart.addSeries(LineSeries, {
@@ -339,6 +367,7 @@ export function CandleChart({
         lastValueVisible: false,
         priceLineVisible: false,
         crosshairMarkerVisible: false,
+        autoscaleInfoProvider: () => null,
         title: `CHoCH ${event.direction === 'long' ? '↑' : '↓'}`,
       })
       breakLine.setData([
@@ -354,15 +383,44 @@ export function CandleChart({
       color: '#ff9800',
       text: 'CHoCH',
     }))
+    const recentBos = analysis.bosEvents.filter((event) => event.time >= oneHourAgo)
+    const displayedBos = [...new Map(
+      [...recentBos, ...visibleSetups.filter((setup) => setup.setupType === 'trend-continuation').map((setup) => setup.choch)]
+        .map((event) => [`${event.direction}-${event.time}`, event]),
+    ).values()]
+    displayedBos.forEach((event) => {
+      const breakLine = chart.addSeries(LineSeries, {
+        color: '#8b9cff',
+        lineWidth: 2,
+        lineStyle: LineStyle.Dashed,
+        lastValueVisible: false,
+        priceLineVisible: false,
+        crosshairMarkerVisible: false,
+        autoscaleInfoProvider: () => null,
+        title: `BOS ${event.direction === 'long' ? '↑' : '↓'}`,
+      })
+      breakLine.setData([
+        { time: event.brokenSwing.time as Time, value: event.brokenSwing.price },
+        { time: event.time as Time, value: event.brokenSwing.price },
+      ])
+      overlaySeriesRef.current.push(breakLine)
+    })
+    const bosMarkers = displayedBos.map((event) => ({
+      time: event.time as Time,
+      position: event.direction === 'long' ? 'belowBar' as const : 'aboveBar' as const,
+      shape: 'circle' as const,
+      color: '#8b9cff',
+      text: 'BOS',
+    }))
     const setupMarkers = visibleSetups.map((setup) => ({
       time: (setup.entryTime ?? setup.choch.time) as Time,
       position: setup.direction === 'long' ? 'belowBar' as const : 'aboveBar' as const,
       shape: 'square' as const,
       color: alignedSetupIdSet.has(setup.id) ? '#39d98a' : '#dfbb74',
-      text: `${setupTimeLabel(setup.choch.time)} ${setup.direction.toUpperCase()} · ${setup.status === 'filled' ? 'TRADE OPEN' : 'WAITING PULLBACK'}`,
+      text: `${setupTimeLabel(setup.choch.time)} ${setup.setupType === 'choch' ? 'CHoCH' : 'TREND'} ${setup.direction.toUpperCase()} · ${setup.status === 'filled' ? 'TRADE OPEN' : 'WAITING PULLBACK'}`,
     }))
-    markerPluginRef.current?.setMarkers([...chochMarkers, ...setupMarkers].sort((a, b) => Number(a.time) - Number(b.time)))
-  }, [analysis, tradeSetups, alignedSetupIds, showResolvedSetups])
+    markerPluginRef.current?.setMarkers([...chochMarkers, ...bosMarkers, ...setupMarkers].sort((a, b) => Number(a.time) - Number(b.time)))
+  }, [overlayRevision])
 
   return (
     <div className="chart-wrap">

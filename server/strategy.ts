@@ -5,7 +5,7 @@ import { config } from './config.js'
 import { pool } from './db.js'
 import type { FairValueGap } from '../src/lib/structureStrategy.js'
 
-const STRATEGY_VERSION = 'structure-v7'
+const STRATEGY_VERSION = 'structure-v8'
 interface StrategyScanResult {
   scanned: number
   bias: 'long' | 'short' | 'neutral'
@@ -42,7 +42,10 @@ async function loadCandles(interval: '1' | '15', limit: number): Promise<Candle[
     close: Number(close),
     volume: Number(volume),
     confirmed: Number(time) / 1000 + duration <= Date.now() / 1000,
-  })).reverse()
+  })).filter((candle) => [candle.time, candle.open, candle.high, candle.low, candle.close, candle.volume].every(Number.isFinite)
+    && candle.high >= Math.max(candle.open, candle.close, candle.low)
+    && candle.low <= Math.min(candle.open, candle.close, candle.high))
+    .reverse()
 }
 
 const outcomeFor = (setup: FairValueGap) => {
@@ -66,16 +69,22 @@ async function expireStaleUnfilledPredictions(userId: string) {
 }
 
 async function reconcileExistingPredictions(userId: string, setups: FairValueGap[]) {
-  const pending = await pool.query<{ id: string; signal_key: string }>(
-    `SELECT id, signal_key FROM trade_notifications
+  const pending = await pool.query<{ id: string; signal_key: string; direction: 'long' | 'short'; detected_at: Date }>(
+    `SELECT id, signal_key, direction, detected_at FROM trade_notifications
      WHERE user_id = $1 AND outcome IN ('waiting', 'active')`,
     [userId],
   )
   const byId = new Map(setups.map((setup) => [setup.id, setup]))
+  const byEvent = new Map(setups.map((setup) => [
+    `${setup.direction}:${setup.choch.time}`,
+    setup,
+  ]))
   for (const notification of pending.rows) {
     const setupId = notification.signal_key.slice(notification.signal_key.indexOf(':') + 1)
-    const setup = byId.get(setupId)
-    if (!setup || !['won', 'lost', 'missed', 'cancelled'].includes(setup.status)) continue
+    const setup = byId.get(setupId) ?? byEvent.get(
+      `${notification.direction}:${Math.floor(notification.detected_at.getTime() / 1000)}`,
+    )
+    if (!setup) continue
     const result = outcomeFor(setup)
     await pool.query(
       `UPDATE trade_notifications SET
@@ -93,11 +102,24 @@ async function performStrategyScan(userId: string): Promise<StrategyScanResult> 
     loadCandles('1', 1000),
     loadCandles('15', 500),
   ])
-  const oneMinute = analyzeStructure(oneMinuteCandles.filter((candle) => candle.confirmed))
-  const fifteenMinute = analyzeStructure(fifteenMinuteCandles.filter((candle) => candle.confirmed))
+  const oneMinute = analyzeStructure(oneMinuteCandles)
+  const fifteenMinute = analyzeStructure(fifteenMinuteCandles)
+  const runtime = await getStrategyRuntime(userId)
   await reconcileExistingPredictions(userId, oneMinute.fairValueGaps)
   await expireStaleUnfilledPredictions(userId)
-  const runtime = await getStrategyRuntime(userId)
+  const unresolved = await pool.query<{ count: string }>(
+    `SELECT COUNT(*)::text AS count FROM trade_notifications
+     WHERE user_id = $1 AND outcome IN ('waiting', 'active')`,
+    [userId],
+  )
+  if (Number(unresolved.rows[0].count) > 0) {
+    const movedRuntime = await pool.query<{ started_at: Date }>(
+      `UPDATE strategy_runtime SET started_at = NOW(), updated_at = NOW()
+       WHERE user_id = $1 RETURNING started_at`,
+      [userId],
+    )
+    return { scanned: 0, bias: fifteenMinute.bias, startedAt: movedRuntime.rows[0].started_at }
+  }
   const startedAtSeconds = runtime.startedAt.getTime() / 1000
   const eligible = oneMinute.fairValueGaps
     .filter((setup) => setup.choch.time >= startedAtSeconds)
@@ -110,11 +132,13 @@ async function performStrategyScan(userId: string): Promise<StrategyScanResult> 
       .at(-1)?.direction ?? 'neutral'
     await pool.query(
       `INSERT INTO trade_notifications
-        (user_id, signal_key, strategy_version, direction, higher_timeframe_bias, detected_at, entry_time, exit_time,
+        (user_id, signal_key, strategy_version, setup_type, direction, higher_timeframe_bias, detected_at, entry_time, exit_time,
          entry_price, stop_price, target_price, exit_price, risk_usd, outcome, r_result)
-       VALUES ($1, $2, $3, $4, $5, TO_TIMESTAMP($6), TO_TIMESTAMP($7), TO_TIMESTAMP($8),
-         $9, $10, $11, $12, $13, $14, $15)
+       VALUES ($1, $2, $3, $4, $5, $6, TO_TIMESTAMP($7), TO_TIMESTAMP($8), TO_TIMESTAMP($9),
+         $10, $11, $12, $13, $14, $15, $16)
        ON CONFLICT (user_id, signal_key) DO UPDATE SET
+         setup_type = EXCLUDED.setup_type,
+         higher_timeframe_bias = EXCLUDED.higher_timeframe_bias,
          entry_time = EXCLUDED.entry_time,
          exit_time = EXCLUDED.exit_time,
          entry_price = EXCLUDED.entry_price,
@@ -124,7 +148,7 @@ async function performStrategyScan(userId: string): Promise<StrategyScanResult> 
          outcome = EXCLUDED.outcome,
          r_result = EXCLUDED.r_result,
          updated_at = NOW()`,
-      [userId, `${STRATEGY_VERSION}:${setup.id}`, STRATEGY_VERSION, setup.direction, knownBias, setup.choch.time,
+      [userId, `${STRATEGY_VERSION}:${setup.id}`, STRATEGY_VERSION, setup.setupType, setup.direction, knownBias, setup.choch.time,
         setup.entryTime ?? null, setup.exitTime ?? null, setup.midpoint, setup.stopPrice,
         setup.targetPrice, setup.exitPrice ?? null, config.strategyRiskUsd, result.outcome, result.rResult],
     )

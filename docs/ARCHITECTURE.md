@@ -36,7 +36,7 @@ Random historical endpoint and 500/800/1,000-candle sample
               ↓
 Bybit historical candles
               ↓
-15m structure bias + 1m CHoCH/FVG engine
+15m trend context + 1m BOS/CHoCH/FVG engine
               ↓
 Trade lifecycle → win rate / net R / USD profit / drawdown
 ```
@@ -47,7 +47,8 @@ The backtest and live scanner share the same deterministic strategy module. Each
 
 The chart is built with TradingView Lightweight Charts. Its strategy annotations are automated, while the view supports cursor and touch navigation. Mouse-wheel or pinch gestures zoom, dragging moves through candle history, dragging either axis changes its scale, and double-clicking an axis resets it. Live updates stop forcing the chart back to real time after the user navigates away; **Latest candles** restores the live view. It renders:
 
-- dotted swing-structure trend segments;
+- confirmed 1-minute and 15-minute structural trend lines;
+- BOS markers at higher-high/lower-low breaks;
 - CHoCH arrows at closed-candle breaks;
 - softly shaded FVG zones;
 - a gold midpoint entry;
@@ -56,9 +57,9 @@ The chart is built with TradingView Lightweight Charts. Its strategy annotations
 
 The one-at-a-time one-minute setup remains visible until its prediction is missed/cancelled or its filled trade wins/loses. While waiting, the chart shows only the FVG, midpoint entry line, and **Waiting for pullback** state. After entry fills, it adds viewport-wide SL/TP levels, translucent risk/reward bands, and a **Trade open** state. Gold identifies a setup against the current 15-minute bias; green identifies an aligned setup. Its time-stamped tag is placed above the setup candle for shorts and below it for longs. Resolved live overlays are removed automatically; the backtest chart can deliberately restore one selected completed trade. **Fit setup** restores the applicable automatic price range.
 
-Live updates modify only new candle data. Strategy overlays are rebuilt only when a candle closes, not for every update to the current candle. Rolling the 300-candle window no longer resets the visible range, and trade overlays are excluded from automatic price scaling so a distant 4R target cannot compress the candle view into an apparently blank chart.
+Live updates modify only new candle data. Strategy overlays rebuild only when structure or setup state changes, not for every mouse movement or price tick. Input OHLC rows are validated, drag-follow state changes are deduplicated, and a chart-local recovery boundary prevents a rendering failure from blanking the page.
 
-Pending signals carry a strategy version. `structure-v7` identifies the predictive post-CHoCH entry lifecycle, 60-minute waiting limit, and automatic strategy measurement. Older version records remain available as legacy history; the persisted version-7 runtime timestamp defines the new measurement baseline.
+Pending signals carry a strategy version and setup type. `structure-v8` adds BOS continuation, confirmed structural trend lines, and live-wick lifecycle evaluation. Older records remain available; unresolved version-7 trades are reconciled and keep the single slot occupied before version-8 begins.
 
 The chart, server scanner, notification outcomes, and backtester all consume the same strategy implementation.
 
@@ -66,7 +67,7 @@ In production, an in-process Railway worker scans all application users sequenti
 
 ## Notification decisions
 
-The server scans 500 closed 15-minute candles and 1,000 closed 1-minute candles. Version-7 one-minute setups are processed chronologically through the same slot used by the chart and deduplicated in PostgreSQL. The dashboard separates waiting/active pullback predictions from finished history. After a filled setup reaches stop or target, the user may optionally record whether it was personally taken:
+The server scans 500 15-minute candles and 1,000 1-minute candles. Closed candles form patterns; the current open candle participates only in the lifecycle of an already-published setup. Version-8 setups are processed chronologically through the same slot used by the chart and deduplicated in PostgreSQL. The dashboard separates waiting/active pullback predictions from finished history.
 
 Finished history displays the setup detection time, midpoint entry-fill time, and resolution time. Wins identify the exit as a TP hit, losses as an SL hit, while unfilled missed and cancelled predictions retain their appropriate non-trade labels. All timestamps render in the browser's local timezone.
 
@@ -78,7 +79,7 @@ The prediction is announced after CHoCH and FVG confirmation, and only a later c
 ## Performance definitions
 
 - **Net profit:** Sum of `pnlUsd` for closed trades. Other currencies are display conversions only.
-- **Strategy win rate:** All version-7 filled wins divided by filled wins plus losses, independent of user decisions; missed and cancelled predictions are excluded.
+- **Strategy win rate:** All version-8 filled wins divided by filled wins plus losses, independent of user decisions; missed and cancelled predictions are excluded.
 - **Automatic strategy summary:** One dashboard card combines that win-rate percentage with the same completed setup set's net R and simulated currency P/L (`risk_usd × r_result`).
 - **Overall win rate:** Accepted portfolio wins divided by wins plus losses; legacy cancellations and breakeven trades are excluded.
 - **Today's win rate:** The same calculation restricted to decisive trades closed today in the user's local timezone.

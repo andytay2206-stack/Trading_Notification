@@ -68,6 +68,7 @@ export async function initializeDatabase() {
       id BIGSERIAL PRIMARY KEY,
       user_id BIGINT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
       signal_key TEXT NOT NULL,
+      setup_type TEXT NOT NULL DEFAULT 'choch' CHECK (setup_type IN ('choch', 'trend-continuation')),
       symbol TEXT NOT NULL DEFAULT 'BTCUSDT',
       direction TEXT NOT NULL CHECK (direction IN ('long', 'short')),
       timeframe TEXT NOT NULL DEFAULT '1',
@@ -104,6 +105,10 @@ export async function initializeDatabase() {
       ON trades(source_notification_id) WHERE source_notification_id IS NOT NULL;
     ALTER TABLE backtest_runs ADD COLUMN IF NOT EXISTS cancellations INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE trade_notifications ADD COLUMN IF NOT EXISTS strategy_version TEXT NOT NULL DEFAULT 'structure-v1';
+    ALTER TABLE trade_notifications ADD COLUMN IF NOT EXISTS setup_type TEXT NOT NULL DEFAULT 'choch';
+    ALTER TABLE trade_notifications DROP CONSTRAINT IF EXISTS trade_notifications_setup_type_check;
+    ALTER TABLE trade_notifications ADD CONSTRAINT trade_notifications_setup_type_check
+      CHECK (setup_type IN ('choch', 'trend-continuation'));
     ALTER TABLE trade_notifications ADD COLUMN IF NOT EXISTS exit_price NUMERIC(20, 8);
     ALTER TABLE trade_notifications DROP CONSTRAINT IF EXISTS trade_notifications_outcome_check;
     UPDATE trade_notifications SET outcome = 'cancelled' WHERE outcome = 'expired';

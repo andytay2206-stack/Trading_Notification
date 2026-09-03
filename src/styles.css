@@ -171,6 +171,7 @@ h2 { font: 600 20px Manrope, sans-serif; letter-spacing: -.025em; margin-bottom:
 .indicator-legend i { width: 14px; height: 2px; display: inline-block; }
 .indicator-legend .trend-up { border-top: 1px dotted var(--green); }
 .indicator-legend .choch-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gold); }
+.indicator-legend .bos-dot { width: 7px; height: 7px; border-radius: 50%; background: #8b9cff; }
 .indicator-legend .fvg-line { border-top: 2px dashed var(--green); }
 .indicator-legend b { margin-left: auto; font-weight: 500; }
 .chart-wrap { position: relative; }

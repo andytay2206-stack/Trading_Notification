@@ -46,7 +46,7 @@ describe('market structure strategy', () => {
     const longGap = { direction: 'long' as const, choch: { time: 10 } }
     const shortGap = { direction: 'short' as const, choch: { time: 10 } }
     const oneMinute = { swings: [], chochEvents: [], fairValueGaps: [longGap, shortGap], biasChanges: [], bias: 'long' as const }
-    const fifteenMinute = { swings: [], chochEvents: [], fairValueGaps: [], biasChanges: [{ time: 0, direction: 'short' as const }], bias: 'short' as const }
+    const fifteenMinute = { swings: [], chochEvents: [], bosEvents: [], trendLines: [], fairValueGaps: [], biasChanges: [{ time: 0, direction: 'short' as const }], bias: 'short' as const }
     expect(alignedOneMinuteSetups(oneMinute as never, fifteenMinute)).toEqual([shortGap])
   })
 
@@ -55,6 +55,28 @@ describe('market structure strategy', () => {
     expect(analysis.chochEvents).toHaveLength(0)
     expect(analysis.fairValueGaps).toHaveLength(0)
     expect(analysis.bias).toBe('neutral')
+  })
+
+  it('confirms BOS, connects the two lows, and creates a trend-continuation FVG setup', () => {
+    const data = [
+      candle(0, 10, 10.5, 9.8, 10),
+      candle(1, 10, 10.2, 9, 9.6),
+      candle(2, 10.6, 12, 10.5, 11.7),
+      candle(3, 11, 11, 10, 10.7),
+      candle(4, 10.7, 12.5, 10.8, 12.2),
+      candle(5, 12.2, 12.4, 11.2, 11.5),
+      candle(6, 11.5, 11.6, 11, 11.2),
+    ]
+    const analysis = analyzeStructure(data, { pivotLength: 1, stopBufferPercent: 5, rewardRisk: 4 })
+    const bos = analysis.bosEvents.find((event) => event.direction === 'long')
+    const setup = analysis.fairValueGaps.find((gap) => gap.setupType === 'trend-continuation' && gap.direction === 'long')
+
+    expect(bos).toMatchObject({ index: 4, brokenSwing: { index: 2 }, invalidationSwing: { index: 3 } })
+    expect(analysis.trendLines).toContainEqual(expect.objectContaining({
+      direction: 'long', start: expect.objectContaining({ index: 1 }), end: expect.objectContaining({ index: 3 }),
+    }))
+    expect(setup).toMatchObject({ bottom: 11, top: 11.2, midpoint: 11.1, setupType: 'trend-continuation' })
+    expect(setup?.entryTime).toBe(data[6].time)
   })
 
   it('keeps tracking a filled trade until the 4R target', () => {
@@ -134,6 +156,24 @@ describe('market structure strategy', () => {
     expect(setup?.status).toBe('filled')
     expect(setup?.entryTime).toBe(data[13].time)
     expect(setup?.exitTime).toBeUndefined()
+  })
+
+  it('uses a still-forming candle wick to fill and finish published setups', () => {
+    const fillCandle = { ...bullishSequence[11], confirmed: false }
+    const filled = analyzeStructure([...bullishSequence.slice(0, 11), fillCandle], {
+      pivotLength: 1, stopBufferPercent: 5, rewardRisk: 4,
+    }).fairValueGaps.find((gap) => gap.direction === 'long')
+
+    expect(filled?.status).toBe('filled')
+    expect(filled?.entryTime).toBe(fillCandle.time)
+
+    const targetCandle = { ...bullishSequence[12], confirmed: false }
+    const won = analyzeStructure([...bullishSequence.slice(0, 12), targetCandle], {
+      pivotLength: 1, stopBufferPercent: 5, rewardRisk: 4,
+    }).fairValueGaps.find((gap) => gap.direction === 'long')
+
+    expect(won?.status).toBe('won')
+    expect(won?.exitTime).toBe(targetCandle.time)
   })
 
   it('ignores later setups until the selected setup has finished', () => {
