@@ -68,6 +68,7 @@ export function CandleChart({
     analysis.chochEvents.map((event) => `${event.direction}:${event.time}:${event.price}`).join(','),
     analysis.bosEvents.map((event) => `${event.direction}:${event.time}:${event.price}`).join(','),
     analysis.trendLines.map((line) => `${line.id}:${line.confirmedAt}`).join(','),
+    analysis.fvgZones.map((gap) => gap.id).join(','),
     higherTimeframeAnalysis?.trendLines.map((line) => `15m:${line.id}:${line.confirmedAt}`).join(',') ?? '',
     analysis.fairValueGaps.map((gap) => `${gap.id}:${gap.status}:${gap.entryTime ?? ''}:${gap.exitTime ?? ''}:${gap.endTime}`).join(','),
     visibleSetups.map((setup) => `${setup.id}:${setup.status}:${setup.entryTime ?? ''}:${setup.exitTime ?? ''}:${setup.endTime}`).join(','),
@@ -238,13 +239,14 @@ export function CandleChart({
       overlaySeriesRef.current.push(line)
     })
 
-    const recentGaps = analysis.fairValueGaps.filter((gap) => gap.choch.time >= oneHourAgo).slice(-3)
+    const recentGaps = analysis.fvgZones.filter((gap) => gap.middleTime >= oneHourAgo).slice(-3)
     const displayedGaps = [...new Map(
       [...recentGaps, ...visibleSetups].map((gap) => [gap.id, gap]),
     ).values()]
     displayedGaps.forEach((gap) => {
       const zoneColor = gap.direction === 'long' ? '38, 166, 154' : '239, 83, 80'
-      const isSelectedGap = visibleSetups.some((setup) => setup.id === gap.id)
+      const selectedSetup = visibleSetups.find((setup) => setup.id === gap.id)
+      const isSelectedGap = Boolean(selectedSetup)
       const zone = chart.addSeries(BaselineSeries, {
         baseValue: { type: 'price', price: gap.bottom },
         relativeGradient: true,
@@ -258,7 +260,9 @@ export function CandleChart({
         lastValueVisible: false,
         priceLineVisible: false,
       })
-      const zoneEnd = (showResolvedSetups && gap.exitTime ? gap.exitTime : gap.endTime) as Time
+      const zoneEnd = (selectedSetup
+        ? (showResolvedSetups && selectedSetup.exitTime ? selectedSetup.exitTime : selectedSetup.endTime)
+        : latestTime) as Time
       zone.setData([
         { time: gap.startTime as Time, value: gap.top },
         { time: zoneEnd, value: gap.top },
@@ -267,7 +271,7 @@ export function CandleChart({
     })
 
     visibleSetups.forEach((activeSetup) => {
-      const setupLabel = setupTimeLabel(activeSetup.choch.time)
+      const setupLabel = setupTimeLabel(activeSetup.detectedTime)
       const bandStart = (activeSetup.entryTime ?? activeSetup.startTime) as Time
       const bandEnd = (showResolvedSetups && activeSetup.exitTime ? activeSetup.exitTime : activeSetup.endTime) as Time
       const showTradeLevels = showResolvedSetups || activeSetup.status === 'filled'
@@ -382,11 +386,11 @@ export function CandleChart({
       text: 'BOS',
     }))
     const setupMarkers = visibleSetups.map((setup) => ({
-      time: (setup.entryTime ?? setup.choch.time) as Time,
+      time: (setup.entryTime ?? setup.detectedTime) as Time,
       position: setup.direction === 'long' ? 'belowBar' as const : 'aboveBar' as const,
       shape: 'square' as const,
       color: alignedSetupIdSet.has(setup.id) ? '#39d98a' : '#dfbb74',
-      text: `${setupTimeLabel(setup.choch.time)} ${setup.direction.toUpperCase()} · ${setup.status === 'filled' ? 'TRADE OPEN' : 'WAITING PULLBACK'}`,
+      text: `${setupTimeLabel(setup.detectedTime)} ${setup.direction.toUpperCase()} · ${setup.status === 'filled' ? 'TRADE OPEN' : 'WAITING PULLBACK'}`,
     }))
     markerPluginRef.current?.setMarkers([...chochMarkers, ...bosMarkers, ...setupMarkers].sort((a, b) => Number(a.time) - Number(b.time)))
   }, [overlayRevision])

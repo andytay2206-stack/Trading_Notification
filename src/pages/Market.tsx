@@ -117,14 +117,14 @@ export function Market() {
   const alignedSetups = useMemo(
     () => interval === '1' && strategyStartedAt !== null
       ? oneSetupAtATime(alignedOneMinuteSetups(analysis, fifteenMinuteAnalysis)
-        .filter((setup) => setup.choch.time >= strategyStartedAt))
+        .filter((setup) => setup.detectedTime >= strategyStartedAt))
       : [],
     [analysis, fifteenMinuteAnalysis, interval, strategyStartedAt],
   )
   const selectedSetups = useMemo(
     () => interval === '1' && strategyStartedAt !== null
       ? oneSetupAtATime(analysis.fairValueGaps
-        .filter((setup) => setup.choch.time >= strategyStartedAt))
+        .filter((setup) => setup.detectedTime >= strategyStartedAt))
       : [],
     [analysis, interval, strategyStartedAt],
   )

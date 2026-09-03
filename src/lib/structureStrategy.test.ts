@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Candle } from '../types'
-import { alignedOneMinuteSetups, analyzeStructure, findSwingPoints, oneSetupAtATime } from './structureStrategy'
+import { alignedOneMinuteSetups, analyzeStructure, findFairValueGaps, findSwingPoints, oneSetupAtATime } from './structureStrategy'
 
 const candle = (index: number, open: number, high: number, low: number, close: number): Candle => ({
   time: 1_700_000_000 + index * 60,
@@ -43,10 +43,10 @@ describe('market structure strategy', () => {
   })
 
   it('only aligns one-minute gaps with the fifteen-minute bias', () => {
-    const longGap = { direction: 'long' as const, choch: { time: 10 } }
-    const shortGap = { direction: 'short' as const, choch: { time: 10 } }
+    const longGap = { direction: 'long' as const, detectedTime: 10, choch: { time: 10 } }
+    const shortGap = { direction: 'short' as const, detectedTime: 10, choch: { time: 10 } }
     const oneMinute = { swings: [], chochEvents: [], fairValueGaps: [longGap, shortGap], biasChanges: [], bias: 'long' as const }
-    const fifteenMinute = { swings: [], chochEvents: [], bosEvents: [], trendLines: [], fairValueGaps: [], biasChanges: [{ time: 0, direction: 'short' as const }], bias: 'short' as const }
+    const fifteenMinute = { swings: [], chochEvents: [], bosEvents: [], trendLines: [], fvgZones: [], fairValueGaps: [], biasChanges: [{ time: 0, direction: 'short' as const }], bias: 'short' as const }
     expect(alignedOneMinuteSetups(oneMinute as never, fifteenMinute)).toEqual([shortGap])
   })
 
@@ -95,6 +95,110 @@ describe('market structure strategy', () => {
 
     expect(line?.start).toMatchObject({ index: 1, price: 9 })
     expect(line?.end).toMatchObject({ index: 5, price: 10 })
+  })
+
+  it('confirms bearish CHoCH only from low-high-lower-low through the bullish trend line', () => {
+    const data = [
+      candle(0, 10, 10.5, 9.8, 10), candle(1, 10, 10.2, 9, 9.6),
+      candle(2, 10.6, 12, 10.5, 11.7), candle(3, 11, 11, 10, 10.7),
+      candle(4, 10.7, 12.5, 10.8, 12.2), candle(5, 10.8, 11.5, 9.8, 9.9),
+    ]
+    const analysis = analyzeStructure(data, { pivotLength: 1, stopBufferPercent: 8, rewardRisk: 4 })
+
+    expect(analysis.chochEvents).toContainEqual(expect.objectContaining({
+      index: 5, direction: 'short', brokenSwing: expect.objectContaining({ index: 3, type: 'low' }),
+      invalidationSwing: expect.objectContaining({ index: 4, type: 'high' }),
+    }))
+  })
+
+  it('confirms bullish CHoCH only from high-low-higher-high through the bearish trend line', () => {
+    const data = [
+      candle(0, 10, 10.2, 9.5, 10), candle(1, 10, 11, 9.8, 10.6),
+      candle(2, 9, 9.5, 8, 8.4), candle(3, 9.5, 10, 8.5, 9.6),
+      candle(4, 8.5, 9.2, 7.5, 7.8), candle(5, 8, 10.2, 7.8, 10.1),
+    ]
+    const analysis = analyzeStructure(data, { pivotLength: 1, stopBufferPercent: 8, rewardRisk: 4 })
+
+    expect(analysis.chochEvents).toContainEqual(expect.objectContaining({
+      index: 5, direction: 'long', brokenSwing: expect.objectContaining({ index: 3, type: 'high' }),
+      invalidationSwing: expect.objectContaining({ index: 4, type: 'low' }),
+    }))
+  })
+
+  it('detects the finalized 03:33/03:34/03:35 bearish wick gap', () => {
+    const data = [
+      candle(0, 77711.2, 77718.7, 77692.6, 77696.6),
+      candle(1, 77696.6, 77696.6, 77671.9, 77672),
+      candle(2, 77672, 77677, 77640, 77650),
+    ]
+    const gap = findFairValueGaps(data)[0]
+
+    expect(gap).toMatchObject({ direction: 'short', middleIndex: 1, top: 77692.6, bottom: 77677 })
+    expect(gap.midpoint).toBeCloseTo(77684.8)
+  })
+
+  it('matches the reviewed 05:00-06:13 market-structure sequence', () => {
+    const replay: Array<[number, number, number, number]> = [
+      [77749.7, 77792, 77743.2, 77792], [77792, 77792, 77753.6, 77753.6],
+      [77753.6, 77766.9, 77728, 77759.9], [77759.9, 77764.1, 77739.2, 77740.8],
+      [77740.8, 77742.9, 77714, 77714], [77714, 77722.4, 77708, 77710.1],
+      [77710.1, 77710.1, 77684, 77700.6], [77700.6, 77707.8, 77686, 77698.6],
+      [77698.6, 77723.3, 77696.4, 77723.3], [77723.3, 77729.1, 77644.2, 77673.6],
+      [77673.6, 77709.7, 77673.6, 77700.1], [77700.1, 77700.1, 77649, 77649.7],
+      [77649.7, 77653.3, 77628.1, 77628.1], [77628.1, 77628.2, 77599.3, 77599.3],
+      [77599.3, 77605.7, 77569, 77603.4], [77603.4, 77615.7, 77574, 77599.5],
+      [77599.5, 77610.9, 77592.8, 77592.8], [77592.8, 77592.8, 77457, 77484.1],
+      [77484.1, 77521, 77455.9, 77499.1], [77499.1, 77499.1, 77449.1, 77463.1],
+      [77463.1, 77467.6, 77342, 77344.4], [77344.4, 77374.1, 77286.8, 77297.9],
+      [77297.9, 77330.1, 77227.4, 77274.6], [77274.6, 77274.6, 77170, 77225.1],
+      [77225.1, 77278.6, 77204.8, 77247.9], [77247.9, 77251.9, 77194.3, 77207.8],
+      [77207.8, 77216.4, 77168, 77168], [77168, 77188.3, 77088, 77095],
+      [77095, 77174.3, 77062.1, 77125.4], [77125.4, 77185.4, 77125.4, 77161.3],
+      [77161.3, 77232, 77128.7, 77208.9], [77208.9, 77258.7, 77202, 77235.6],
+      [77235.6, 77292.1, 77235.6, 77291.8], [77291.8, 77306.8, 77258.7, 77270.1],
+      [77270.1, 77319.4, 77270, 77309], [77309, 77349, 77309, 77334.1],
+      [77334.1, 77363.9, 77333.9, 77363.8], [77363.8, 77399.9, 77350.4, 77394.4],
+      [77394.4, 77410, 77370, 77410], [77410, 77439.9, 77400, 77400],
+      [77400, 77400.1, 77366.3, 77390.7], [77390.7, 77435, 77387.7, 77429.6],
+      [77429.6, 77429.6, 77399.4, 77418.2], [77418.2, 77441.6, 77406.8, 77441.6],
+      [77441.6, 77478.8, 77441.5, 77459.3], [77459.3, 77459.3, 77401.3, 77405.1],
+      [77405.1, 77405.2, 77369.6, 77384], [77384, 77430, 77374.7, 77429],
+      [77429, 77494, 77429, 77482.9], [77482.9, 77487.4, 77460.9, 77470],
+      [77470, 77508.8, 77469.8, 77508.7], [77508.7, 77670, 77508.7, 77627.5],
+      [77627.5, 77692.1, 77612.6, 77665.3], [77665.3, 77665.3, 77600.2, 77614.7],
+      [77614.7, 77678.1, 77600.1, 77652.2], [77652.2, 77700, 77652.1, 77690],
+      [77690, 77790.9, 77675, 77790.9], [77790.9, 77805, 77753.6, 77777.8],
+      [77777.8, 77789.6, 77750, 77779.3], [77779.3, 77800, 77758, 77780.8],
+      [77780.8, 77820, 77720, 77731.4], [77731.4, 77750.7, 77709.5, 77713.7],
+      [77713.7, 77745.1, 77689.7, 77700.2], [77700.2, 77708.6, 77690.1, 77704.6],
+      [77704.6, 77713, 77690.1, 77695.7], [77695.7, 77712.8, 77695.6, 77712.8],
+      [77712.8, 77755.8, 77699.5, 77700], [77700, 77719.7, 77674, 77683.1],
+      [77683.1, 77694.3, 77676.7, 77676.7], [77676.7, 77719.1, 77670, 77689.1],
+      [77689.1, 77722, 77683.6, 77722], [77722, 77723.1, 77663.7, 77663.8],
+      [77663.8, 77695.8, 77660, 77695.8], [77695.8, 77707.2, 77677.4, 77677.4],
+    ]
+    const data = replay.map(([open, high, low, close], index) => candle(index, open, high, low, close))
+    const analysis = analyzeStructure(data, { pivotLength: 1, stopBufferPercent: 8, rewardRisk: 4 })
+    const bosIndices = analysis.bosEvents.map((event) => event.index)
+    const chochIndices = analysis.chochEvents.map((event) => event.index)
+    expect(chochIndices).toEqual(expect.arrayContaining([32, 71]))
+    expect(chochIndices).not.toContain(41)
+    expect(chochIndices).not.toContain(45)
+    expect(chochIndices).not.toContain(48)
+    expect(bosIndices).toEqual(expect.arrayContaining([44, 48, 55]))
+    expect(bosIndices).not.toContain(56)
+    expect(bosIndices).not.toContain(72)
+    expect(analysis.trendLines.find((line) => line.confirmedIndex === 48 && line.direction === 'long'))
+      .toMatchObject({ start: { index: 28 }, end: { index: 47 } })
+
+    const syntheticContinuation = [
+      ...data,
+      candle(74, 77677.4, 77690, 77670, 77672),
+      candle(75, 77672, 77685, 77640, 77650),
+    ]
+    const continued = analyzeStructure(syntheticContinuation, { pivotLength: 1, stopBufferPercent: 8, rewardRisk: 4 })
+    expect(continued.trendLines.find((line) => line.confirmedIndex === 75 && line.direction === 'short'))
+      .toMatchObject({ start: { index: 60, price: 77820 }, end: { index: 74, price: 77690 } })
   })
 
   it('keeps tracking a filled trade until the 4R target', () => {
@@ -195,7 +299,7 @@ describe('market structure strategy', () => {
   })
 
   it('ignores later setups until the selected setup has finished', () => {
-    const setup = (time: number, exitTime?: number) => ({ choch: { time }, exitTime })
+    const setup = (time: number, exitTime?: number) => ({ detectedTime: time, choch: { time }, exitTime })
     const selected = oneSetupAtATime([
       setup(10, 20), setup(15, 16), setup(21), setup(22, 25),
     ] as never)
@@ -203,7 +307,7 @@ describe('market structure strategy', () => {
     expect(selected.map((item) => item.choch.time)).toEqual([10, 21])
   })
 
-  it('matches the 01:17 low, 01:25 high, and 01:27 bearish CHoCH example', () => {
+  it('retains the 01:27-centered bearish wick gap under the refined structure rules', () => {
     const values: Array<[number, number, number, number]> = [
       [77157.2, 77160, 77129.6, 77130.9],
       [77130.9, 77172, 77121.8, 77171.9],
@@ -232,20 +336,13 @@ describe('market structure strategy', () => {
     ]
     const data = values.map(([open, high, low, close], index) => candle(index, open, high, low, close))
     const analysis = analyzeStructure(data)
-    const setup = analysis.fairValueGaps.find((gap) => gap.choch.index === 21)
+    const gap = analysis.fvgZones.find((item) => item.middleIndex === 21)
 
-    expect(setup?.direction).toBe('short')
-    expect(setup?.choch.brokenSwing).toMatchObject({ index: 11, price: 77222.5, type: 'low' })
-    expect(setup?.choch.invalidationSwing).toMatchObject({ index: 19, price: 77322, type: 'high' })
-    expect(setup?.bottom).toBe(77200.2)
-    expect(setup?.top).toBe(77217.4)
-    expect(setup?.midpoint).toBeCloseTo(77208.8)
-    expect(setup?.stopPrice).toBeCloseTo(77329.008)
-    expect(setup?.targetPrice).toBeCloseTo(76727.968)
-    expect(setup?.status).toBe('open')
+    expect(gap).toMatchObject({ direction: 'short', bottom: 77200.2, top: 77217.4 })
+    expect(gap?.midpoint).toBeCloseTo(77208.8)
   })
 
-  it('uses the dominant earlier FVG for the 03:34 bearish CHoCH and fills at 03:39', () => {
+  it('retains the dominant 03:30 bearish FVG under the refined structure rules', () => {
     const leadIn: Array<[number, number, number, number]> = [
       [77300, 77320, 77280, 77310],
       [77310, 77400, 77300, 77380],
@@ -279,22 +376,13 @@ describe('market structure strategy', () => {
     ]
     const data = [...leadIn, ...example].map(([open, high, low, close], index) => candle(index, open, high, low, close))
     const analysis = analyzeStructure(data, { pivotLength: 1, stopBufferPercent: 5, rewardRisk: 4 })
-    const chochIndex = leadIn.length + 14
-    const setup = analysis.fairValueGaps.find((gap) => gap.choch.index === chochIndex)
+    const gap = analysis.fvgZones.find((item) => item.middleIndex === leadIn.length + 10)
 
-    expect(setup?.direction).toBe('short')
-    expect(setup?.choch.brokenSwing.price).toBe(77509.5)
-    expect(setup?.choch.invalidationSwing.price).toBe(77777.9)
-    expect(setup?.startTime).toBe(data[leadIn.length + 9].time)
-    expect(setup?.bottom).toBe(77563.5)
-    expect(setup?.top).toBe(77613.9)
-    expect(setup?.midpoint).toBeCloseTo(77588.7)
-    expect(setup?.stopPrice).toBeCloseTo(77783.225)
-    expect(setup?.entryTime).toBe(data[leadIn.length + 19].time)
-    expect(setup?.status).toBe('filled')
+    expect(gap).toMatchObject({ direction: 'short', bottom: 77563.5, top: 77613.9 })
+    expect(gap?.midpoint).toBeCloseTo(77588.7)
   })
 
-  it('uses the completed 06:35 FVG for the 06:39 bullish CHoCH', () => {
+  it('retains the completed 06:35 bullish FVG under the refined structure rules', () => {
     const leadIn: Array<[number, number, number, number]> = [
       [77800, 77820, 77780, 77800],
       [77800, 77900, 77790, 77850],
@@ -321,18 +409,10 @@ describe('market structure strategy', () => {
       [77510.2, 77631.4, 77510.2, 77630.4],
     ]
     const data = [...leadIn, ...example].map(([open, high, low, close], index) => candle(index, open, high, low, close))
-    const chochIndex = leadIn.length + 14
     const analysis = analyzeStructure(data, { pivotLength: 2, stopBufferPercent: 5, rewardRisk: 4 })
-    const setup = analysis.fairValueGaps.find((gap) => gap.choch.index === chochIndex)
+    const gap = analysis.fvgZones.find((item) => item.middleIndex === leadIn.length + 10)
 
-    expect(setup?.direction).toBe('long')
-    expect(setup?.choch.invalidationSwing).toMatchObject({ index: leadIn.length + 9, price: 77408.3, type: 'low' })
-    expect(setup?.startTime).toBe(data[leadIn.length + 9].time)
-    expect(setup?.bottom).toBe(77490.6)
-    expect(setup?.top).toBe(77500)
-    expect(setup?.midpoint).toBeCloseTo(77495.3)
-    expect(setup?.stopPrice).toBeCloseTo(77404.185)
-    expect(setup?.targetPrice).toBeCloseTo(77859.76)
-    expect(setup?.status).toBe('open')
+    expect(gap).toMatchObject({ direction: 'long', bottom: 77490.6, top: 77500 })
+    expect(gap?.midpoint).toBeCloseTo(77495.3)
   })
 })

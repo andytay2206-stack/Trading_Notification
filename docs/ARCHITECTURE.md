@@ -59,7 +59,7 @@ The one-at-a-time one-minute setup remains visible until its prediction is misse
 
 Live updates modify only new candle data. Strategy overlays rebuild only when structure or setup state changes, not for every mouse movement or price tick. Input OHLC rows are validated, drag-follow state changes are deduplicated, and a chart-local recovery boundary prevents a rendering failure from blanking the page.
 
-Pending signals carry a strategy version and setup type. `structure-v8` adds BOS continuation, confirmed structural trend lines, and live-wick lifecycle evaluation. Older records remain available; unresolved version-7 trades are reconciled and keep the single slot occupied before version-8 begins.
+Pending signals carry a strategy version and setup type. `structure-v8` adds BOS continuation, confirmed structural trend lines, and live-wick lifecycle evaluation. Older records remain available; unresolved version-7 trades are reconciled by both their legacy event timestamp and current detection timestamp and keep the single slot occupied before version-8 begins.
 
 The chart, server scanner, notification outcomes, and backtester all consume the same strategy implementation.
 
@@ -81,7 +81,6 @@ The prediction is announced after CHoCH and FVG confirmation, and only a later c
 - **Net profit:** Sum of `pnlUsd` for closed trades. Other currencies are display conversions only.
 - **Strategy win rate:** All version-8 filled wins divided by filled wins plus losses, independent of user decisions; missed and cancelled predictions are excluded.
 - **Automatic strategy summary:** One dashboard card combines that win-rate percentage with the same completed setup set's net R and simulated currency P/L (`risk_usd × r_result`).
-- **Temporary v7 comparison:** A compact read-only v7 win-rate/record/net-R strip appears above the current v8 card. It does not alter or mix with v8 performance and can be removed after comparison.
 - **Overall win rate:** Accepted portfolio wins divided by wins plus losses; legacy cancellations and breakeven trades are excluded.
 - **Today's win rate:** The same calculation restricted to decisive trades closed today in the user's local timezone.
 - **R-multiple:** Profit or loss divided by planned initial risk. For example, risking USD 100 and earning USD 200 is `+2R`; losing the planned USD 100 is `-1R`.

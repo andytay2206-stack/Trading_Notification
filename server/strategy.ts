@@ -68,23 +68,64 @@ async function expireStaleUnfilledPredictions(userId: string) {
   )
 }
 
-async function reconcileExistingPredictions(userId: string, setupsByVersion: Record<string, FairValueGap[]>) {
+async function reconcileExistingPredictions(
+  userId: string,
+  setupsByVersion: Record<string, FairValueGap[]>,
+  oneMinuteCandles: Candle[],
+) {
   const pending = await pool.query<{
     id: string
     signal_key: string
     strategy_version: string
     direction: 'long' | 'short'
+    outcome: 'waiting' | 'active'
     detected_at: Date
+    entry_time: Date | null
+    entry_price: string
+    stop_price: string
+    target_price: string
   }>(
-    `SELECT id, signal_key, strategy_version, direction, detected_at FROM trade_notifications
+    `SELECT id, signal_key, strategy_version, direction, outcome, detected_at, entry_time,
+       entry_price, stop_price, target_price
+     FROM trade_notifications
      WHERE user_id = $1 AND outcome IN ('waiting', 'active')`,
     [userId],
   )
   const indexes = new Map(Object.entries(setupsByVersion).map(([version, setups]) => [version, {
-    byId: new Map(setups.map((setup) => [setup.id, setup])),
-    byEvent: new Map(setups.map((setup) => [`${setup.direction}:${setup.choch.time}`, setup])),
+    byId: new Map(setups.flatMap((setup) => [
+      [setup.id, setup] as const,
+      [`${setup.setupType}-${setup.direction}-${setup.choch.time}`, setup] as const,
+    ])),
+    byEvent: new Map(setups.flatMap((setup) => [
+      [`${setup.direction}:${setup.detectedTime}`, setup] as const,
+      [`${setup.direction}:${setup.choch.time}`, setup] as const,
+    ])),
   }]))
   for (const notification of pending.rows) {
+    if (notification.outcome === 'active' && notification.entry_time) {
+      const entryTime = notification.entry_time.getTime() / 1000
+      const stopPrice = Number(notification.stop_price)
+      const targetPrice = Number(notification.target_price)
+      const resolution = oneMinuteCandles.find((candle) => {
+        if (candle.time < entryTime) return false
+        const stopped = notification.direction === 'long' ? candle.low <= stopPrice : candle.high >= stopPrice
+        const targeted = notification.direction === 'long' ? candle.high >= targetPrice : candle.low <= targetPrice
+        return stopped || targeted
+      })
+      if (resolution) {
+        const stopped = notification.direction === 'long'
+          ? resolution.low <= stopPrice
+          : resolution.high >= stopPrice
+        await pool.query(
+          `UPDATE trade_notifications SET exit_time = TO_TIMESTAMP($3), exit_price = $4,
+             outcome = $5, r_result = $6, updated_at = NOW()
+           WHERE id = $1 AND user_id = $2`,
+          [notification.id, userId, resolution.time, stopped ? stopPrice : targetPrice,
+            stopped ? 'loss' : 'win', stopped ? -1 : 4],
+        )
+      }
+      continue
+    }
     const index = indexes.get(notification.strategy_version) ?? indexes.get(STRATEGY_VERSION)
     if (!index) continue
     const setupId = notification.signal_key.slice(notification.signal_key.indexOf(':') + 1)
@@ -112,6 +153,7 @@ async function performStrategyScan(userId: string): Promise<StrategyScanResult> 
   const oneMinute = analyzeStructure(oneMinuteCandles)
   const versionSevenOneMinute = analyzeStructure(oneMinuteCandles, {
     ...defaultStructureSettings,
+    pivotLength: 2,
     stopBufferPercent: 5,
   })
   const fifteenMinute = analyzeStructure(fifteenMinuteCandles)
@@ -119,7 +161,7 @@ async function performStrategyScan(userId: string): Promise<StrategyScanResult> 
   await reconcileExistingPredictions(userId, {
     [STRATEGY_VERSION]: oneMinute.fairValueGaps,
     'structure-v7': versionSevenOneMinute.fairValueGaps,
-  })
+  }, oneMinuteCandles)
   await expireStaleUnfilledPredictions(userId)
   const unresolved = await pool.query<{ count: string }>(
     `SELECT COUNT(*)::text AS count FROM trade_notifications
@@ -136,13 +178,13 @@ async function performStrategyScan(userId: string): Promise<StrategyScanResult> 
   }
   const startedAtSeconds = runtime.startedAt.getTime() / 1000
   const eligible = oneMinute.fairValueGaps
-    .filter((setup) => setup.choch.time >= startedAtSeconds)
+    .filter((setup) => setup.detectedTime >= startedAtSeconds)
   const setups = oneSetupAtATime(eligible)
 
   for (const setup of setups) {
     const result = outcomeFor(setup)
     const knownBias = fifteenMinute.biasChanges
-      .filter((change) => change.time <= setup.choch.time)
+      .filter((change) => change.time <= setup.detectedTime)
       .at(-1)?.direction ?? 'neutral'
     await pool.query(
       `INSERT INTO trade_notifications
@@ -162,7 +204,7 @@ async function performStrategyScan(userId: string): Promise<StrategyScanResult> 
          outcome = EXCLUDED.outcome,
          r_result = EXCLUDED.r_result,
          updated_at = NOW()`,
-      [userId, `${STRATEGY_VERSION}:${setup.id}`, STRATEGY_VERSION, setup.setupType, setup.direction, knownBias, setup.choch.time,
+      [userId, `${STRATEGY_VERSION}:${setup.id}`, STRATEGY_VERSION, setup.setupType, setup.direction, knownBias, setup.detectedTime,
         setup.entryTime ?? null, setup.exitTime ?? null, setup.midpoint, setup.stopPrice,
         setup.targetPrice, setup.exitPrice ?? null, config.strategyRiskUsd, result.outcome, result.rResult],
     )

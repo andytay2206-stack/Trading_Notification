@@ -49,7 +49,7 @@ export function runStructureBacktest(
   }
   const oneMinute = analyzeStructure(oneMinuteCandles, settings)
   const setups = oneSetupAtATime(oneMinute.fairValueGaps)
-    .filter((setup) => setup.choch.time >= windowStart && setup.choch.time <= windowEnd)
+    .filter((setup) => setup.detectedTime >= windowStart && setup.detectedTime <= windowEnd)
   const trades: BacktestTrade[] = setups
     .filter((setup) => setup.entryTime && setup.exitTime
       && (setup.status === 'won' || setup.status === 'lost'))

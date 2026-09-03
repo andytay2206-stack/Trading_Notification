@@ -14,7 +14,7 @@ const WARMUP_WINDOW = 12 * HOUR
 const initialConfig: BacktestConfig = {
   interval: '1',
   candleCount: 1000,
-  pivotLength: 2,
+  pivotLength: 1,
   stopBufferPercent: 8,
   rewardRisk: 4,
   riskUsd: 100,
@@ -66,8 +66,8 @@ export function Backtest() {
   const higherTimeframeAnalysis = useMemo(() => analyzeStructure(higherTimeframeCandles), [higherTimeframeCandles])
   const chartSetups = useMemo(
     () => oneSetupAtATime(chartAnalysis.fairValueGaps)
-      .filter((setup) => setup.choch.time >= (windowStart ?? Number.NEGATIVE_INFINITY)
-        && setup.choch.time <= (windowEnd ?? Number.POSITIVE_INFINITY)),
+      .filter((setup) => setup.detectedTime >= (windowStart ?? Number.NEGATIVE_INFINITY)
+        && setup.detectedTime <= (windowEnd ?? Number.POSITIVE_INFINITY)),
     [chartAnalysis, windowStart, windowEnd],
   )
   const selectedSetup = useMemo(
@@ -148,7 +148,7 @@ export function Backtest() {
                   higherTimeframeAnalysis={higherTimeframeAnalysis}
                   tradeSetups={selectedSetup ? [selectedSetup] : []}
                   showResolvedSetups
-                  focusTime={selectedSetup?.entryTime ?? selectedSetup?.choch.time}
+                  focusTime={selectedSetup?.entryTime ?? selectedSetup?.detectedTime}
                 />
               </section>
 

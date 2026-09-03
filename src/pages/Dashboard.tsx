@@ -80,7 +80,6 @@ export function Dashboard({ currency, onCurrencyChange, onOpenMarket }: Dashboar
   const predictions = notifications.filter(isPrediction)
   const historyNotifications = notifications.filter(isFinished)
   const strategyStats = automaticStats(notifications, CURRENT_STRATEGY_VERSION)
-  const legacyStrategyStats = automaticStats(notifications, 'structure-v7')
 
   return (
     <main>
@@ -122,10 +121,6 @@ export function Dashboard({ currency, onCurrencyChange, onOpenMarket }: Dashboar
       <section className="metric-grid">
         <MetricCard eyebrow="Net profit" value={formatCurrency(performance.totalPnlUsd, currency)} detail={`${signedR(performance.totalR)} all time`} tone={performance.totalPnlUsd >= 0 ? 'positive' : 'negative'} featured />
         <article className="metric-card strategy-performance-card">
-          <div className="legacy-strategy-summary">
-            <span><small>Previous strategy v7</small><b>{legacyStrategyStats.winRate.toFixed(1)}%</b></span>
-            <small>{legacyStrategyStats.wins} wins · {legacyStrategyStats.losses} losses · {signedR(legacyStrategyStats.netR)}</small>
-          </div>
           <div className="metric-eyebrow">Current automatic strategy · v8</div>
           <div className={`metric-value ${strategyStats.pnlUsd >= 0 ? 'positive' : 'negative'}`}>{strategyStats.winRate.toFixed(1)}%</div>
           <div className="strategy-performance-values">
