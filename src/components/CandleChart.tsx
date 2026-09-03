@@ -57,7 +57,9 @@ export function CandleChart({
   const lastSeriesTimeRef = useRef<number | null>(null)
   const fittedSetupIdRef = useRef<string | null>(null)
   const followLatestRef = useRef(true)
+  const interactionRef = useRef(false)
   const [isFollowingLatest, setIsFollowingLatest] = useState(true)
+  const [interactionEpoch, setInteractionEpoch] = useState(0)
   const visibleSetups = showResolvedSetups
     ? tradeSetups
     : tradeSetups.filter((setup) => setup.status === 'open' || setup.status === 'filled')
@@ -67,13 +69,15 @@ export function CandleChart({
     analysis.swings.map((swing) => `${swing.type}:${swing.time}:${swing.price}`).join(','),
     analysis.chochEvents.map((event) => `${event.direction}:${event.time}:${event.price}`).join(','),
     analysis.bosEvents.map((event) => `${event.direction}:${event.time}:${event.price}`).join(','),
-    analysis.trendLines.map((line) => `${line.id}:${line.confirmedAt}`).join(','),
+    (analysis.displayTrendLines ?? analysis.trendLines).map((line) => `${line.id}:${line.confirmedAt}`).join(','),
     analysis.fvgZones.map((gap) => gap.id).join(','),
-    higherTimeframeAnalysis?.trendLines.map((line) => `15m:${line.id}:${line.confirmedAt}`).join(',') ?? '',
+    (higherTimeframeAnalysis?.displayTrendLines ?? higherTimeframeAnalysis?.trendLines)
+      ?.map((line) => `15m:${line.id}:${line.confirmedAt}`).join(',') ?? '',
     analysis.fairValueGaps.map((gap) => `${gap.id}:${gap.status}:${gap.entryTime ?? ''}:${gap.exitTime ?? ''}:${gap.endTime}`).join(','),
     visibleSetups.map((setup) => `${setup.id}:${setup.status}:${setup.entryTime ?? ''}:${setup.exitTime ?? ''}:${setup.endTime}`).join(','),
     [...alignedSetupIdSet].sort().join(','),
     String(showResolvedSetups),
+    String(interactionEpoch),
   ].join('|') : ''
 
   const showLatestCandles = () => {
@@ -150,6 +154,19 @@ export function CandleChart({
     }
     chart.timeScale().subscribeVisibleLogicalRangeChange(handleVisibleRangeChange)
 
+    const beginInteraction = () => {
+      interactionRef.current = true
+    }
+    const finishInteraction = () => {
+      if (!interactionRef.current) return
+      interactionRef.current = false
+      setInteractionEpoch((value) => value + 1)
+    }
+    container.addEventListener('pointerdown', beginInteraction, true)
+    window.addEventListener('pointerup', finishInteraction)
+    window.addEventListener('pointercancel', finishInteraction)
+    window.addEventListener('blur', finishInteraction)
+
     let disposed = false
     const observer = new ResizeObserver(() => {
       if (!disposed && container.clientWidth > 0) chart.applyOptions({ width: container.clientWidth })
@@ -159,6 +176,10 @@ export function CandleChart({
     return () => {
       disposed = true
       observer.disconnect()
+      container.removeEventListener('pointerdown', beginInteraction, true)
+      window.removeEventListener('pointerup', finishInteraction)
+      window.removeEventListener('pointercancel', finishInteraction)
+      window.removeEventListener('blur', finishInteraction)
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(handleVisibleRangeChange)
       chart.remove()
       chartRef.current = null
@@ -203,13 +224,18 @@ export function CandleChart({
   useEffect(() => {
     const chart = chartRef.current
     if (!chart || !analysis) return
+    // Removing and recreating overlay series while Lightweight Charts is in
+    // an active pointer gesture can invalidate its internal hit-test state.
+    // Defer the rebuild until pointerup; candle-series updates continue live.
+    if (interactionRef.current) return
     overlaySeriesRef.current.forEach((series) => chart.removeSeries(series))
     overlaySeriesRef.current = []
 
     const latestTime = candles.at(-1)?.time ?? 0
     const oneHourAgo = latestTime - 60 * 60
     const latestByDirection = (source: StructureAnalysis | undefined) => (['long', 'short'] as const)
-      .map((direction) => source?.trendLines.filter((line) => line.direction === direction).at(-1))
+      .map((direction) => (source?.displayTrendLines ?? source?.trendLines)
+        ?.filter((line) => line.direction === direction).at(-1))
       .filter((line): line is StructureAnalysis['trendLines'][number] => Boolean(line))
     const displayedTrendLines = [
       ...latestByDirection(analysis).map((line) => ({ line, timeframe: '1m' as const })),

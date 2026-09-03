@@ -70,6 +70,7 @@ export interface StructureAnalysis {
   chochEvents: ChochEvent[]
   bosEvents: BosEvent[]
   trendLines: TrendLine[]
+  displayTrendLines?: TrendLine[]
   fvgZones: FvgZone[]
   fairValueGaps: FairValueGap[]
   biasChanges: Array<{ time: number; direction: TradeSide }>
@@ -136,6 +137,71 @@ export function findFairValueGaps(candles: Candle[]): FvgZone[] {
     }
   }
   return gaps
+}
+
+export function findDisplayTrendLines(
+  candles: Candle[],
+  swings: SwingPoint[],
+  latestChoch?: ChochEvent,
+  windowSize = 180,
+): TrendLine[] {
+  const windowStart = Math.max(0, candles.length - windowSize)
+  const firstLiveIndex = candles.findIndex((candle) => candle.confirmed === false)
+  const endExclusive = firstLiveIndex === -1 ? candles.length : firstLiveIndex
+  if (endExclusive - windowStart < 3) return []
+
+  const windowCandles = candles.slice(windowStart, endExclusive)
+  const lowestOffset = windowCandles.reduce((selected, item, index) => (
+    item.low < windowCandles[selected].low ? index : selected
+  ), 0)
+  const highestOffset = windowCandles.reduce((selected, item, index) => (
+    item.high > windowCandles[selected].high ? index : selected
+  ), 0)
+  const lowestIndex = windowStart + lowestOffset
+  const highestIndex = windowStart + highestOffset
+  const departureIndex = Math.min(lowestIndex + 1, endExclusive - 1)
+  const bullishStart: SwingPoint = {
+    time: candles[departureIndex].time,
+    price: candles[departureIndex].low,
+    index: departureIndex,
+    type: 'low',
+  }
+  const bearishStart: SwingPoint = {
+    time: candles[highestIndex].time,
+    price: candles[highestIndex].high,
+    index: highestIndex,
+    type: 'high',
+  }
+  const confirmedSwings = swings.filter((swing) => swing.index >= windowStart && swing.index < endExclusive)
+  const bullishEndLimit = latestChoch?.direction === 'short' ? latestChoch.index + 1 : endExclusive - 1
+  const bearishEndLimit = latestChoch?.direction === 'long' ? latestChoch.index + 1 : endExclusive - 1
+  const bullishEnd = confirmedSwings.filter((swing) => swing.type === 'low'
+    && swing.index > bullishStart.index && swing.index <= bullishEndLimit && swing.price > bullishStart.price)
+    .map((swing) => ({ swing, slope: (swing.price - bullishStart.price) / (swing.index - bullishStart.index) }))
+    .sort((a, b) => a.slope - b.slope || b.swing.index - a.swing.index)[0]?.swing
+  const bearishEnd = confirmedSwings.filter((swing) => swing.type === 'high'
+    && swing.index > bearishStart.index && swing.index <= bearishEndLimit && swing.price < bearishStart.price)
+    .map((swing) => ({ swing, slope: (swing.price - bearishStart.price) / (swing.index - bearishStart.index) }))
+    .sort((a, b) => b.slope - a.slope || b.swing.index - a.swing.index)[0]?.swing
+
+  return [
+    ...(bullishEnd ? [{
+      id: `display-long-${bullishStart.time}-${bullishEnd.time}`,
+      direction: 'long' as const,
+      start: bullishStart,
+      end: bullishEnd,
+      confirmedAt: candles[Math.min(bullishEnd.index + 1, endExclusive - 1)].time,
+      confirmedIndex: Math.min(bullishEnd.index + 1, endExclusive - 1),
+    }] : []),
+    ...(bearishEnd ? [{
+      id: `display-short-${bearishStart.time}-${bearishEnd.time}`,
+      direction: 'short' as const,
+      start: bearishStart,
+      end: bearishEnd,
+      confirmedAt: candles[Math.min(bearishEnd.index + 1, endExclusive - 1)].time,
+      confirmedIndex: Math.min(bearishEnd.index + 1, endExclusive - 1),
+    }] : []),
+  ]
 }
 
 export function analyzeStructure(candles: Candle[], settings = defaultStructureSettings): StructureAnalysis {
@@ -441,8 +507,12 @@ export function analyzeStructure(candles: Candle[], settings = defaultStructureS
   })
 
   const bias = chronologicalBiasChanges.at(-1)?.direction ?? 'neutral'
+  const displayTrendLines = findDisplayTrendLines(candles, swings, chochEvents.at(-1))
 
-  return { swings, chochEvents, bosEvents, trendLines, fvgZones, fairValueGaps, biasChanges: chronologicalBiasChanges, bias }
+  return {
+    swings, chochEvents, bosEvents, trendLines, displayTrendLines, fvgZones, fairValueGaps,
+    biasChanges: chronologicalBiasChanges, bias,
+  }
 }
 
 export function alignedOneMinuteSetups(oneMinute: StructureAnalysis, fifteenMinute: StructureAnalysis) {

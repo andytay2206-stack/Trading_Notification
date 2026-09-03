@@ -26,6 +26,12 @@ interface CandleRequest {
 }
 
 const intervalSeconds = (interval: CandleInterval) => interval === 'D' ? 86_400 : Number(interval) * 60
+const validCandle = (candle: Candle) => [
+  candle.time, candle.open, candle.high, candle.low, candle.close, candle.volume,
+].every(Number.isFinite)
+  && candle.time > 0
+  && candle.high >= Math.max(candle.open, candle.close, candle.low)
+  && candle.low <= Math.min(candle.open, candle.close, candle.high)
 
 export async function fetchCandles(interval: CandleInterval, signal?: AbortSignal, request: CandleRequest = {}): Promise<Candle[]> {
   const params = new URLSearchParams({
@@ -49,9 +55,7 @@ export async function fetchCandles(interval: CandleInterval, signal?: AbortSigna
     close: Number(close),
     volume: Number(volume),
     confirmed: Number(time) / 1000 + intervalSeconds(interval) <= Date.now() / 1000,
-  })).filter((candle) => [candle.time, candle.open, candle.high, candle.low, candle.close, candle.volume].every(Number.isFinite)
-    && candle.high >= Math.max(candle.open, candle.close, candle.low)
-    && candle.low <= Math.min(candle.open, candle.close, candle.high))
+  })).filter(validCandle)
     .reverse()
 }
 
@@ -108,7 +112,7 @@ export function subscribeToCandles(
         volume: Number(item.volume),
         confirmed: Boolean(item.confirm),
       }
-      if (![candle.time, candle.open, candle.high, candle.low, candle.close, candle.volume].every(Number.isFinite)) return
+      if (!validCandle(candle)) return
       onCandle(candle)
     } catch {
       // Ignore a malformed stream event; the REST poll remains available as fallback.

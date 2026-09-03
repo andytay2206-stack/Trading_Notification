@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Candle } from '../types'
-import { alignedOneMinuteSetups, analyzeStructure, findFairValueGaps, findSwingPoints, oneSetupAtATime } from './structureStrategy'
+import { alignedOneMinuteSetups, analyzeStructure, findDisplayTrendLines, findFairValueGaps, findSwingPoints, oneSetupAtATime } from './structureStrategy'
 
 const candle = (index: number, open: number, high: number, low: number, close: number): Candle => ({
   time: 1_700_000_000 + index * 60,
@@ -40,6 +40,23 @@ describe('market structure strategy', () => {
       expect.objectContaining({ index: 2, type: 'high', price: 15 }),
       expect.objectContaining({ index: 4, type: 'low', price: 8 }),
     ]))
+  })
+
+  it('derives stable 180-candle display trend anchors and freezes the broken line', () => {
+    const data = Array.from({ length: 180 }, (_, index) => candle(index, 100, 101, 99, 100))
+    data[10] = candle(10, 92, 93, 90, 92)
+    data[11] = candle(11, 92, 94, 91, 93)
+    data[100] = candle(100, 118, 120, 117, 119)
+    data[137] = candle(137, 114, 115, 113, 114)
+    data[158] = candle(158, 96, 97, 95, 96)
+    data[162] = candle(162, 113, 114, 112, 113)
+    const swings = findSwingPoints(data, 1)
+    const lines = findDisplayTrendLines(data, swings, { direction: 'long', index: 136 } as never)
+
+    expect(lines.find((line) => line.direction === 'long'))
+      .toMatchObject({ start: { index: 11, price: 91 }, end: { index: 158, price: 95 } })
+    expect(lines.find((line) => line.direction === 'short'))
+      .toMatchObject({ start: { index: 100, price: 120 }, end: { index: 137, price: 115 } })
   })
 
   it('only aligns one-minute gaps with the fifteen-minute bias', () => {
