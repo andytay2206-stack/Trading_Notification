@@ -15,7 +15,7 @@ const initialConfig: BacktestConfig = {
   interval: '1',
   candleCount: 1000,
   pivotLength: 2,
-  stopBufferPercent: 5,
+  stopBufferPercent: 8,
   rewardRisk: 4,
   riskUsd: 100,
 }
@@ -88,7 +88,7 @@ export function Backtest() {
         <span className="pill">BTCUSDT · Bybit</span>
       </section>
 
-      <div className="demo-banner"><span>Structure strategy v8</span> 15m directional context · 1m BOS trend continuation or CHoCH reversal · wick-defined FVG midpoint entry · 5% candle-range stop buffer · 4R target.</div>
+      <div className="demo-banner"><span>Structure strategy v8</span> 15m directional context · 1m BOS trend continuation or CHoCH reversal · wick-defined FVG midpoint entry · 8% candle-range stop buffer · 4R target.</div>
 
       <section className="backtest-layout">
         <aside className="panel backtest-controls">

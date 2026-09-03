@@ -54,8 +54,8 @@ This is the current precise interpretation of the requested gap inside the CHoCH
 
 ## Risk and outcome
 
-- Bullish stop: near and below the latest confirmed opposing swing wick before CHoCH, buffered by 5% of that candle's full high-low range.
-- Bearish stop: near and above the latest confirmed opposing swing wick before CHoCH, buffered by 5% of that candle's full high-low range.
+- Bullish stop: near and below the latest confirmed opposing swing wick before the structural break, buffered by 8% of that candle's full high-low range.
+- Bearish stop: near and above the latest confirmed opposing swing wick before the structural break, buffered by 8% of that candle's full high-low range.
 - `1R` is the distance from FVG midpoint entry to that stop.
 - Target is exactly `4R` from entry.
 - If one candle contains both stop and target, the engine records the stop first (`−1R`) because candle data cannot reveal intrabar ordering.

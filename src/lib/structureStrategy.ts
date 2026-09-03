@@ -77,7 +77,7 @@ export interface StrategySettings {
 
 export const defaultStructureSettings: StrategySettings = {
   pivotLength: 2,
-  stopBufferPercent: 5,
+  stopBufferPercent: 8,
   rewardRisk: 4,
   maxEntryWaitCandles: 60,
 }

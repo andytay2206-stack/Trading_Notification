@@ -240,8 +240,8 @@ describe('market structure strategy', () => {
     expect(setup?.bottom).toBe(77200.2)
     expect(setup?.top).toBe(77217.4)
     expect(setup?.midpoint).toBeCloseTo(77208.8)
-    expect(setup?.stopPrice).toBeCloseTo(77326.38)
-    expect(setup?.targetPrice).toBeCloseTo(76738.48)
+    expect(setup?.stopPrice).toBeCloseTo(77329.008)
+    expect(setup?.targetPrice).toBeCloseTo(76727.968)
     expect(setup?.status).toBe('open')
   })
 

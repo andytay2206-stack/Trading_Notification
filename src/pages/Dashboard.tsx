@@ -17,8 +17,7 @@ const needsDecision = (notification: StrategyNotification) => notification.outco
   || notification.outcome === 'loss'
   || (notification.outcome === 'cancelled' && notification.entry_time !== null)
 const CURRENT_STRATEGY_VERSION = 'structure-v8'
-const isPrediction = (notification: StrategyNotification) => notification.strategy_version === CURRENT_STRATEGY_VERSION
-  && (notification.outcome === 'waiting' || notification.outcome === 'active')
+const isPrediction = (notification: StrategyNotification) => notification.outcome === 'waiting' || notification.outcome === 'active'
 const isFinished = (notification: StrategyNotification) => ['win', 'loss', 'missed', 'cancelled'].includes(notification.outcome)
 const historyTime = (value: string | null) => value
   ? new Date(value).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })

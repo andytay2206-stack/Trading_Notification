@@ -17,7 +17,7 @@
 
 - Review swing-pivot length against visual examples
 - Confirm FVG wick/body boundaries and midpoint entry behavior
-- Confirm the 5% buffer means CHoCH candle range, not market price
+- Confirmed: version-8 uses an 8% opposing-candle-range stop buffer (increased three percentage points from 5%)
 - Add more known bullish and bearish example fixtures
 
 ## Phase 3 — Signal and virtual trade tracking

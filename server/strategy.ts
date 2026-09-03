@@ -1,4 +1,4 @@
-import { analyzeStructure, oneSetupAtATime } from '../src/lib/structureStrategy.js'
+import { analyzeStructure, defaultStructureSettings, oneSetupAtATime } from '../src/lib/structureStrategy.js'
 import type { Candle } from '../src/types.js'
 import { restClient } from './bybit.js'
 import { config } from './config.js'
@@ -68,20 +68,27 @@ async function expireStaleUnfilledPredictions(userId: string) {
   )
 }
 
-async function reconcileExistingPredictions(userId: string, setups: FairValueGap[]) {
-  const pending = await pool.query<{ id: string; signal_key: string; direction: 'long' | 'short'; detected_at: Date }>(
-    `SELECT id, signal_key, direction, detected_at FROM trade_notifications
+async function reconcileExistingPredictions(userId: string, setupsByVersion: Record<string, FairValueGap[]>) {
+  const pending = await pool.query<{
+    id: string
+    signal_key: string
+    strategy_version: string
+    direction: 'long' | 'short'
+    detected_at: Date
+  }>(
+    `SELECT id, signal_key, strategy_version, direction, detected_at FROM trade_notifications
      WHERE user_id = $1 AND outcome IN ('waiting', 'active')`,
     [userId],
   )
-  const byId = new Map(setups.map((setup) => [setup.id, setup]))
-  const byEvent = new Map(setups.map((setup) => [
-    `${setup.direction}:${setup.choch.time}`,
-    setup,
-  ]))
+  const indexes = new Map(Object.entries(setupsByVersion).map(([version, setups]) => [version, {
+    byId: new Map(setups.map((setup) => [setup.id, setup])),
+    byEvent: new Map(setups.map((setup) => [`${setup.direction}:${setup.choch.time}`, setup])),
+  }]))
   for (const notification of pending.rows) {
+    const index = indexes.get(notification.strategy_version) ?? indexes.get(STRATEGY_VERSION)
+    if (!index) continue
     const setupId = notification.signal_key.slice(notification.signal_key.indexOf(':') + 1)
-    const setup = byId.get(setupId) ?? byEvent.get(
+    const setup = index.byId.get(setupId) ?? index.byEvent.get(
       `${notification.direction}:${Math.floor(notification.detected_at.getTime() / 1000)}`,
     )
     if (!setup) continue
@@ -103,9 +110,16 @@ async function performStrategyScan(userId: string): Promise<StrategyScanResult> 
     loadCandles('15', 500),
   ])
   const oneMinute = analyzeStructure(oneMinuteCandles)
+  const versionSevenOneMinute = analyzeStructure(oneMinuteCandles, {
+    ...defaultStructureSettings,
+    stopBufferPercent: 5,
+  })
   const fifteenMinute = analyzeStructure(fifteenMinuteCandles)
   const runtime = await getStrategyRuntime(userId)
-  await reconcileExistingPredictions(userId, oneMinute.fairValueGaps)
+  await reconcileExistingPredictions(userId, {
+    [STRATEGY_VERSION]: oneMinute.fairValueGaps,
+    'structure-v7': versionSevenOneMinute.fairValueGaps,
+  })
   await expireStaleUnfilledPredictions(userId)
   const unresolved = await pool.query<{ count: string }>(
     `SELECT COUNT(*)::text AS count FROM trade_notifications

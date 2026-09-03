@@ -84,7 +84,7 @@ This executes unit tests for performance calculations and creates a production b
 
 ## Backtesting status
 
-The backtester uses the same structural strategy as the live scanner: timestamped 15-minute trend context, 1-minute BOS continuation or CHoCH reversal, and the most relevant wick-defined three-candle FVG midpoint prediction. Entry occurs only when a later candle returns to the midpoint; that live candle's wick can fill entry or hit TP/SL before it closes. The stop remains beyond the opposing swing with a 5% candle-range buffer and the target is 4R. Each run randomly selects 500, 800, or 1,000 historical candles plus structural warm-up data. Fees, funding, slippage, and spread are not included.
+The backtester uses the same structural strategy as the live scanner: timestamped 15-minute trend context, 1-minute BOS continuation or CHoCH reversal, and the most relevant wick-defined three-candle FVG midpoint prediction. Entry occurs only when a later candle returns to the midpoint; that live candle's wick can fill entry or hit TP/SL before it closes. New version-8 setups place the stop beyond the opposing swing with an 8% candle-range buffer and keep the target at 4R. Each run randomly selects 500, 800, or 1,000 historical candles plus structural warm-up data. Fees, funding, slippage, and spread are not included.
 
 ## Development workflow
 
