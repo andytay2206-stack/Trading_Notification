@@ -359,23 +359,6 @@ export function CandleChart({
       [...recentChoch, ...visibleSetups.filter((setup) => setup.setupType === 'choch').map((setup) => setup.choch)]
         .map((event) => [`${event.direction}-${event.time}`, event]),
     ).values()]
-    displayedChoch.forEach((event) => {
-      const breakLine = chart.addSeries(LineSeries, {
-        color: '#ff9800',
-        lineWidth: 2,
-        lineStyle: LineStyle.Dashed,
-        lastValueVisible: false,
-        priceLineVisible: false,
-        crosshairMarkerVisible: false,
-        autoscaleInfoProvider: () => null,
-        title: `CHoCH ${event.direction === 'long' ? '↑' : '↓'}`,
-      })
-      breakLine.setData([
-        { time: event.brokenSwing.time as Time, value: event.brokenSwing.price },
-        { time: event.time as Time, value: event.brokenSwing.price },
-      ])
-      overlaySeriesRef.current.push(breakLine)
-    })
     const chochMarkers = displayedChoch.map((event) => ({
       time: event.time as Time,
       position: event.direction === 'long' ? 'belowBar' as const : 'aboveBar' as const,
@@ -388,23 +371,6 @@ export function CandleChart({
       [...recentBos, ...visibleSetups.filter((setup) => setup.setupType === 'trend-continuation').map((setup) => setup.choch)]
         .map((event) => [`${event.direction}-${event.time}`, event]),
     ).values()]
-    displayedBos.forEach((event) => {
-      const breakLine = chart.addSeries(LineSeries, {
-        color: '#8b9cff',
-        lineWidth: 2,
-        lineStyle: LineStyle.Dashed,
-        lastValueVisible: false,
-        priceLineVisible: false,
-        crosshairMarkerVisible: false,
-        autoscaleInfoProvider: () => null,
-        title: `BOS ${event.direction === 'long' ? '↑' : '↓'}`,
-      })
-      breakLine.setData([
-        { time: event.brokenSwing.time as Time, value: event.brokenSwing.price },
-        { time: event.time as Time, value: event.brokenSwing.price },
-      ])
-      overlaySeriesRef.current.push(breakLine)
-    })
     const bosMarkers = displayedBos.map((event) => ({
       time: event.time as Time,
       position: event.direction === 'long' ? 'belowBar' as const : 'aboveBar' as const,

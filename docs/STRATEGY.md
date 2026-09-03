@@ -84,7 +84,7 @@ When a prediction first appears, the price scale fits its FVG and entry. Once en
 
 The setup receives a time-stamped candle tag. A short tag sits above its entry or CHoCH candle; a long tag sits below it.
 
-CHoCH is drawn as an orange dashed break line and marker; BOS uses a violet break marker. Confirmed 1-minute trend lines connect the structural lows or highs and the latest 15-minute line is overlaid in violet as higher-timeframe context. Three recent softly shaded FVG zones remain visible alongside the selected setup. Colors and annotation hierarchy follow TradingView's dark-chart conventions.
+CHoCH and BOS are shown only as compact markers on their confirming candles; they do not add break-line labels at the right price scale. Confirmed 1-minute trend lines connect the structural lows or highs and the latest 15-minute line is overlaid in violet as higher-timeframe context. Three recent softly shaded FVG zones remain visible alongside the selected setup. Colors and annotation hierarchy follow TradingView's dark-chart conventions.
 
 The automated indicators do not prevent chart navigation. Use the mouse wheel to zoom, drag the chart to move through candle history, drag the time or price axis to rescale, and double-click an axis to reset it. Navigating away pauses automatic real-time following; **Latest candles** returns to the live edge.
 

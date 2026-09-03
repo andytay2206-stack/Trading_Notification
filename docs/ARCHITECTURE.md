@@ -48,8 +48,8 @@ The backtest and live scanner share the same deterministic strategy module. Each
 The chart is built with TradingView Lightweight Charts. Its strategy annotations are automated, while the view supports cursor and touch navigation. Mouse-wheel or pinch gestures zoom, dragging moves through candle history, dragging either axis changes its scale, and double-clicking an axis resets it. Live updates stop forcing the chart back to real time after the user navigates away; **Latest candles** restores the live view. It renders:
 
 - confirmed 1-minute and 15-minute structural trend lines;
-- BOS markers at higher-high/lower-low breaks;
-- CHoCH arrows at closed-candle breaks;
+- BOS markers on higher-high/lower-low break candles;
+- CHoCH arrows on closed-candle break candles, without separate right-scale labels;
 - softly shaded FVG zones;
 - a gold midpoint entry;
 - a red `−1R` stop;
