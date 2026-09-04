@@ -8,6 +8,7 @@ import { config } from './config.js'
 import { closeDatabase, initializeDatabase, pool } from './db.js'
 import { decideNotification, getStrategyRuntime, scanStrategy } from './strategy.js'
 import { startStrategyWorker } from './worker.js'
+import { currentStrategyVersion } from '../src/lib/structureStrategy.js'
 
 const app = express()
 const allowedIntervals = new Set(['1', '3', '5', '15', '30', '60', '120', '240', '360', '720', 'D', 'W', 'M'])
@@ -134,15 +135,40 @@ app.get('/api/strategy/state', async (request, response) => {
 })
 
 app.get('/api/strategy/notifications', async (request, response) => {
-  const result = await pool.query(
-    `SELECT id, signal_key, strategy_version, setup_type, direction, higher_timeframe_bias, detected_at, entry_time, exit_time,
-       entry_price, stop_price, target_price, exit_price, risk_usd, outcome, r_result, decision, decided_at
-     FROM trade_notifications
-     WHERE user_id = $1
-     ORDER BY detected_at DESC LIMIT 100`,
-    [request.user!.id],
-  )
-  response.json({ notifications: result.rows })
+  const [result, performance] = await Promise.all([
+    pool.query(
+      `SELECT id, signal_key, strategy_version, setup_type, direction, higher_timeframe_bias, detected_at, entry_time, exit_time,
+         entry_price, stop_price, target_price, exit_price, risk_usd, outcome, r_result, decision, decided_at
+       FROM trade_notifications
+       WHERE user_id = $1
+       ORDER BY detected_at DESC`,
+      [request.user!.id],
+    ),
+    pool.query<{ wins: string; losses: string; net_r: string; pnl_usd: string }>(
+      `SELECT
+         COUNT(*) FILTER (WHERE outcome = 'win')::text AS wins,
+         COUNT(*) FILTER (WHERE outcome = 'loss')::text AS losses,
+         COALESCE(SUM(r_result) FILTER (WHERE outcome IN ('win', 'loss')), 0)::text AS net_r,
+         COALESCE(SUM(risk_usd * r_result) FILTER (WHERE outcome IN ('win', 'loss')), 0)::text AS pnl_usd
+       FROM trade_notifications
+       WHERE user_id = $1 AND strategy_version = $2`,
+      [request.user!.id, currentStrategyVersion],
+    ),
+  ])
+  const totals = performance.rows[0]
+  const wins = Number(totals.wins)
+  const losses = Number(totals.losses)
+  response.json({
+    notifications: result.rows,
+    automaticPerformance: {
+      strategyVersion: currentStrategyVersion,
+      wins,
+      losses,
+      winRate: wins + losses > 0 ? (wins / (wins + losses)) * 100 : 0,
+      netR: Number(totals.net_r),
+      pnlUsd: Number(totals.pnl_usd),
+    },
+  })
 })
 
 app.patch('/api/strategy/notifications/:id/decision', async (request, response) => {

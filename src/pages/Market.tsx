@@ -3,7 +3,7 @@ import { CandleChart } from '../components/CandleChart'
 import { ChartErrorBoundary } from '../components/ChartErrorBoundary'
 import { fetchCandles, subscribeToCandles } from '../services/bybit'
 import { getStrategyState } from '../services/api'
-import { alignedOneMinuteSetups, analyzeStructure, oneSetupAtATime } from '../lib/structureStrategy'
+import { alignedOneMinuteSetups, analyzeStructure, oneSetupAtATime, strategyCandleLimits } from '../lib/structureStrategy'
 import type { Candle, CandleInterval } from '../types'
 
 const intervals: Array<{ value: CandleInterval; label: string }> = [
@@ -49,7 +49,7 @@ export function Market() {
     setError(null)
     setStatus('connecting')
 
-    const refresh = (initial = false) => fetchCandles(interval, controller.signal, { limit: initial ? 300 : 3 })
+    const refresh = (initial = false) => fetchCandles(interval, controller.signal, { limit: initial ? strategyCandleLimits.oneMinute : 3 })
       .then((incoming) => {
         if (!active) return
         setCandles((current) => initial ? incoming : mergeCandles(current, incoming))
@@ -95,7 +95,7 @@ export function Market() {
 
   useEffect(() => {
     const controller = new AbortController()
-    const loadBias = () => fetchCandles('15', controller.signal, { limit: 500 }).then(setFifteenMinuteCandles).catch(() => undefined)
+    const loadBias = () => fetchCandles('15', controller.signal, { limit: strategyCandleLimits.fifteenMinute }).then(setFifteenMinuteCandles).catch(() => undefined)
     void loadBias()
     const timer = window.setInterval(() => void loadBias(), 60_000)
     return () => {

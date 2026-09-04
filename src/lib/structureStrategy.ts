@@ -92,6 +92,13 @@ export const defaultStructureSettings: StrategySettings = {
   maxEntryWaitCandles: 60,
 }
 
+export const strategyCandleLimits = {
+  oneMinute: 300,
+  fifteenMinute: 500,
+} as const
+
+export const currentStrategyVersion = 'structure-v8'
+
 export function findSwingPoints(candles: Candle[], pivotLength = 1): SwingPoint[] {
   const swings: SwingPoint[] = []
   for (let index = pivotLength; index < candles.length - pivotLength; index += 1) {
@@ -601,4 +608,8 @@ export function oneSetupAtATime(setups: FairValueGap[]) {
   }
 
   return selected
+}
+
+export function setupSequenceAfter(setups: FairValueGap[], exclusiveBoundary: number) {
+  return oneSetupAtATime(setups.filter((setup) => setup.detectedTime > exclusiveBoundary))
 }

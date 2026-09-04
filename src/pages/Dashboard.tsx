@@ -3,8 +3,9 @@ import { CurrencySwitch } from '../components/CurrencySwitch'
 import { MetricCard } from '../components/MetricCard'
 import { formatCurrency } from '../lib/currency'
 import { summarizePerformance } from '../lib/performance'
+import { currentStrategyVersion } from '../lib/structureStrategy'
 import type { Currency, Trade } from '../types'
-import { decideStrategyNotification, getPortfolioTrades, getStrategyNotifications, scanStrategy, type StrategyNotification } from '../services/api'
+import { decideStrategyNotification, getPortfolioTrades, getStrategyNotifications, scanStrategy, type AutomaticStrategyPerformance, type StrategyNotification } from '../services/api'
 
 interface DashboardProps {
   currency: Currency
@@ -16,7 +17,6 @@ const signedR = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(1)}R
 const needsDecision = (notification: StrategyNotification) => notification.outcome === 'win'
   || notification.outcome === 'loss'
   || (notification.outcome === 'cancelled' && notification.entry_time !== null)
-const CURRENT_STRATEGY_VERSION = 'structure-v8'
 const isPrediction = (notification: StrategyNotification) => notification.outcome === 'waiting' || notification.outcome === 'active'
 const isFinished = (notification: StrategyNotification) => ['win', 'loss', 'missed', 'cancelled'].includes(notification.outcome)
 const historyTime = (value: string | null) => value
@@ -39,6 +39,7 @@ const automaticStats = (notifications: StrategyNotification[], version: string) 
 export function Dashboard({ currency, onCurrencyChange, onOpenMarket }: DashboardProps) {
   const [trades, setTrades] = useState<Trade[]>([])
   const [notifications, setNotifications] = useState<StrategyNotification[]>([])
+  const [persistedStrategyStats, setPersistedStrategyStats] = useState<AutomaticStrategyPerformance | null>(null)
   const [loadingSignals, setLoadingSignals] = useState(true)
   const [signalError, setSignalError] = useState<string | null>(null)
   const [decidingId, setDecidingId] = useState<string | null>(null)
@@ -48,6 +49,7 @@ export function Dashboard({ currency, onCurrencyChange, onOpenMarket }: Dashboar
       if (runScan) await scanStrategy()
       const [notificationResponse, portfolioTrades] = await Promise.all([getStrategyNotifications(), getPortfolioTrades()])
       setNotifications(notificationResponse.notifications)
+      setPersistedStrategyStats(notificationResponse.automaticPerformance ?? null)
       setTrades(portfolioTrades)
       setSignalError(null)
     } catch (cause: unknown) {
@@ -79,7 +81,7 @@ export function Dashboard({ currency, onCurrencyChange, onOpenMarket }: Dashboar
   const recentTrades = [...trades].sort((a, b) => (b.closedAt ?? b.openedAt).localeCompare(a.closedAt ?? a.openedAt)).slice(0, 5)
   const predictions = notifications.filter(isPrediction)
   const historyNotifications = notifications.filter(isFinished)
-  const strategyStats = automaticStats(notifications, CURRENT_STRATEGY_VERSION)
+  const strategyStats = persistedStrategyStats ?? automaticStats(notifications, currentStrategyVersion)
 
   return (
     <main>
@@ -165,7 +167,7 @@ export function Dashboard({ currency, onCurrencyChange, onOpenMarket }: Dashboar
       <section className="panel trade-table-panel">
         <div className="panel-heading">
           <div><div className="overline">Journal</div><h2>Recent outcomes</h2></div>
-          <span className="muted">Local time</span>
+          <span className="muted">Chart time</span>
         </div>
         <div className="trade-table">
           <div className="trade-row trade-header"><span>Market</span><span>Side</span><span>Closed</span><span>Result</span><span>P&amp;L</span></div>
@@ -182,12 +184,12 @@ export function Dashboard({ currency, onCurrencyChange, onOpenMarket }: Dashboar
       </section>
 
       <section className="panel signal-history">
-        <div className="panel-heading"><div><div className="overline">Finished trade history</div><h2>Accepted, skipped, finished, and cancelled</h2></div><span className="muted">Strategy result is automatic · decisions only affect portfolio</span></div>
+        <div className="panel-heading"><div><div className="overline">Finished trade history</div><h2>Accepted, skipped, finished, and cancelled</h2></div><span className="muted">{historyNotifications.length} records · chart time</span></div>
         {historyNotifications.length === 0
           ? <div className="notice-empty">Finished strategy setups will appear here automatically.</div>
           : <div className="trade-table">
             <div className="trade-row signal-row trade-header"><span>Setup</span><span>Direction</span><span>Outcome</span><span>Entry</span><span>TP / SL</span><span>Status</span><span>Result</span></div>
-            {historyNotifications.slice(0, 20).map((item) => {
+            {historyNotifications.map((item) => {
               const status = item.outcome === 'cancelled' ? 'cancelled'
                 : item.outcome === 'missed' ? 'skipped'
                   : item.decision === 'accepted' ? 'accepted'

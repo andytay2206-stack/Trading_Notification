@@ -79,7 +79,7 @@ This is the current precise interpretation of the requested gap inside the CHoCH
 
 ## Direction filter
 
-Every 1-minute setup is processed chronologically through the same persisted trade slot. The 15-minute direction is recorded as context: aligned setups are green and counter-bias setups are gold. Both use the same slot, preventing the chart and PostgreSQL scanner from selecting different overlapping trades. A later signal is ignored until the selected prediction is missed or its filled trade wins or loses.
+Every 1-minute setup is processed chronologically through the same persisted trade slot and the same rolling 300-candle decision window in both the chart and Railway. The 15-minute direction is recorded as context: aligned setups are green and counter-bias setups are gold. Both use the same slot. A later signal is ignored until the selected prediction is missed or its filled trade wins or loses, and the completed setup's exit candle is an exclusive boundary for the next prediction.
 
 ## Portfolio decision
 

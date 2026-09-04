@@ -1,11 +1,10 @@
-import { analyzeStructure, defaultStructureSettings, oneSetupAtATime } from '../src/lib/structureStrategy.js'
+import { analyzeStructure, currentStrategyVersion, defaultStructureSettings, setupSequenceAfter, strategyCandleLimits } from '../src/lib/structureStrategy.js'
 import type { Candle } from '../src/types.js'
 import { restClient } from './bybit.js'
 import { config } from './config.js'
 import { pool } from './db.js'
 import type { FairValueGap } from '../src/lib/structureStrategy.js'
 
-const STRATEGY_VERSION = 'structure-v8'
 interface StrategyScanResult {
   scanned: number
   bias: 'long' | 'short' | 'neutral'
@@ -25,7 +24,7 @@ export async function getStrategyRuntime(userId: string) {
        END,
        updated_at = NOW()
      RETURNING started_at`,
-    [userId, STRATEGY_VERSION],
+    [userId, currentStrategyVersion],
   )
   return { startedAt: result.rows[0].started_at }
 }
@@ -43,6 +42,7 @@ async function loadCandles(interval: '1' | '15', limit: number): Promise<Candle[
     volume: Number(volume),
     confirmed: Number(time) / 1000 + duration <= Date.now() / 1000,
   })).filter((candle) => [candle.time, candle.open, candle.high, candle.low, candle.close, candle.volume].every(Number.isFinite)
+    && candle.time > 0
     && candle.high >= Math.max(candle.open, candle.close, candle.low)
     && candle.low <= Math.min(candle.open, candle.close, candle.high))
     .reverse()
@@ -126,7 +126,7 @@ async function reconcileExistingPredictions(
       }
       continue
     }
-    const index = indexes.get(notification.strategy_version) ?? indexes.get(STRATEGY_VERSION)
+    const index = indexes.get(notification.strategy_version) ?? indexes.get(currentStrategyVersion)
     if (!index) continue
     const setupId = notification.signal_key.slice(notification.signal_key.indexOf(':') + 1)
     const setup = index.byId.get(setupId) ?? index.byEvent.get(
@@ -147,8 +147,8 @@ async function reconcileExistingPredictions(
 
 async function performStrategyScan(userId: string): Promise<StrategyScanResult> {
   const [oneMinuteCandles, fifteenMinuteCandles] = await Promise.all([
-    loadCandles('1', 1000),
-    loadCandles('15', 500),
+    loadCandles('1', strategyCandleLimits.oneMinute),
+    loadCandles('15', strategyCandleLimits.fifteenMinute),
   ])
   const oneMinute = analyzeStructure(oneMinuteCandles)
   const versionSevenOneMinute = analyzeStructure(oneMinuteCandles, {
@@ -159,7 +159,7 @@ async function performStrategyScan(userId: string): Promise<StrategyScanResult> 
   const fifteenMinute = analyzeStructure(fifteenMinuteCandles)
   const runtime = await getStrategyRuntime(userId)
   await reconcileExistingPredictions(userId, {
-    [STRATEGY_VERSION]: oneMinute.fairValueGaps,
+    [currentStrategyVersion]: oneMinute.fairValueGaps,
     'structure-v7': versionSevenOneMinute.fairValueGaps,
   }, oneMinuteCandles)
   await expireStaleUnfilledPredictions(userId)
@@ -169,17 +169,17 @@ async function performStrategyScan(userId: string): Promise<StrategyScanResult> 
     [userId],
   )
   if (Number(unresolved.rows[0].count) > 0) {
-    const movedRuntime = await pool.query<{ started_at: Date }>(
-      `UPDATE strategy_runtime SET started_at = NOW(), updated_at = NOW()
-       WHERE user_id = $1 RETURNING started_at`,
-      [userId],
-    )
-    return { scanned: 0, bias: fifteenMinute.bias, startedAt: movedRuntime.rows[0].started_at }
+    return { scanned: 0, bias: fifteenMinute.bias, startedAt: runtime.startedAt }
   }
-  const startedAtSeconds = runtime.startedAt.getTime() / 1000
-  const eligible = oneMinute.fairValueGaps
-    .filter((setup) => setup.detectedTime >= startedAtSeconds)
-  const setups = oneSetupAtATime(eligible)
+  const latestResolution = await pool.query<{ boundary: Date | null }>(
+    `SELECT MAX(exit_time) AS boundary
+     FROM trade_notifications
+     WHERE user_id = $1 AND strategy_version = $2 AND exit_time IS NOT NULL`,
+    [userId, currentStrategyVersion],
+  )
+  const resolvedBoundary = latestResolution.rows[0].boundary?.getTime() ?? Number.NEGATIVE_INFINITY
+  const exclusiveBoundary = Math.max(runtime.startedAt.getTime(), resolvedBoundary) / 1000
+  const setups = setupSequenceAfter(oneMinute.fairValueGaps, exclusiveBoundary)
 
   for (const setup of setups) {
     const result = outcomeFor(setup)
@@ -204,7 +204,7 @@ async function performStrategyScan(userId: string): Promise<StrategyScanResult> 
          outcome = EXCLUDED.outcome,
          r_result = EXCLUDED.r_result,
          updated_at = NOW()`,
-      [userId, `${STRATEGY_VERSION}:${setup.id}`, STRATEGY_VERSION, setup.setupType, setup.direction, knownBias, setup.detectedTime,
+      [userId, `${currentStrategyVersion}:${setup.id}`, currentStrategyVersion, setup.setupType, setup.direction, knownBias, setup.detectedTime,
         setup.entryTime ?? null, setup.exitTime ?? null, setup.midpoint, setup.stopPrice,
         setup.targetPrice, setup.exitPrice ?? null, config.strategyRiskUsd, result.outcome, result.rResult],
     )

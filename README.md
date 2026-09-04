@@ -23,6 +23,7 @@ Northstar is a notification-first futures monitor. A React interface talks to a 
 - Automated BOS, CHoCH, FVG, and 1m/15m trend-line indicators on a navigable TradingView Lightweight Charts view, with one setup slot and a 60-minute pullback-entry window
 - Timestamp-aligned 15-minute context alongside complete one-minute setup tracking
 - Pullback prediction board, automatic strategy win rate, and separate accepted/skipped/finished history
+- Shared 300-candle live/scanner strategy window, PostgreSQL-wide automatic metrics, and complete chart-time history display
 
 Strategy win rate is calculated automatically from every filled version-8 setup that reaches TP or SL. Portfolio metrics remain separate and include only completed notifications that the user confirms were taken. Currency conversions use indicative fixed rates until a live foreign-exchange provider is selected.
 

@@ -75,9 +75,11 @@ In production, an in-process Railway worker scans all application users sequenti
 
 ## Notification decisions
 
-The server scans 500 15-minute candles and 1,000 1-minute candles. Closed candles form patterns; the current open candle participates only in the lifecycle of an already-published setup. Version-8 setups are processed chronologically through the same slot used by the chart and deduplicated in PostgreSQL. The dashboard separates waiting/active pullback predictions from finished history.
+The server and live chart both evaluate exactly 300 one-minute candles; the server retains 500 fifteen-minute candles for directional context. Shared constants prevent either runtime from silently changing one side only. Closed candles form patterns; the current open candle participates only in the lifecycle of an already-published setup. Version-8 setups are processed chronologically through the same slot used by the chart and deduplicated in PostgreSQL.
 
-Finished history displays the setup detection time, midpoint entry-fill time, and resolution time. Wins identify the exit as a TP hit, losses as an SL hit, while unfilled missed and cancelled predictions retain their appropriate non-trade labels. All timestamps render in the browser's local timezone.
+The strategy runtime timestamp is a version baseline, not a moving wall clock. While a prediction or trade is unresolved, the scanner reconciles it and does not advance the cursor or create another setup. Once it resolves, the latest persisted `exit_time` becomes an exclusive boundary: a setup detected on or before that candle cannot reopen a second slot. This prevents both skipped results and same-candle duplicate notifications.
+
+Finished history displays every returned setup with detection time, midpoint entry-fill time, and resolution time. Wins identify the exit as a TP hit, losses as an SL hit, while unfilled missed and cancelled predictions retain their appropriate non-trade labels. All timestamps use the same browser clock as the chart.
 
 - **Check:** adds the result to `trades`, portfolio profit, R, and win rate, while retaining notification history.
 - **Cross:** retains the setup in notification history but excludes it from portfolio performance.
@@ -88,7 +90,7 @@ The prediction is announced after CHoCH and FVG confirmation, and only a later c
 
 - **Net profit:** Sum of `pnlUsd` for closed trades. Other currencies are display conversions only.
 - **Strategy win rate:** All version-8 filled wins divided by filled wins plus losses, independent of user decisions; missed and cancelled predictions are excluded.
-- **Automatic strategy summary:** One dashboard card combines that win-rate percentage with the same completed setup set's net R and simulated currency P/L (`risk_usd × r_result`).
+- **Automatic strategy summary:** PostgreSQL aggregates every version-8 win/loss, independently of the number of history rows rendered. One dashboard card combines win rate with the same completed setup set's net R and simulated currency P/L (`risk_usd × r_result`).
 - **Overall win rate:** Accepted portfolio wins divided by wins plus losses; legacy cancellations and breakeven trades are excluded.
 - **Today's win rate:** The same calculation restricted to decisive trades closed today in the user's local timezone.
 - **R-multiple:** Profit or loss divided by planned initial risk. For example, risking USD 100 and earning USD 200 is `+2R`; losing the planned USD 100 is `-1R`.

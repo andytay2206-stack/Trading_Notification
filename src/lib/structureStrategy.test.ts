@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Candle } from '../types'
-import { alignedOneMinuteSetups, analyzeStructure, findDisplayChochEvents, findDisplayTrendLines, findFairValueGaps, findSwingPoints, oneSetupAtATime } from './structureStrategy'
+import { alignedOneMinuteSetups, analyzeStructure, findDisplayChochEvents, findDisplayTrendLines, findFairValueGaps, findSwingPoints, oneSetupAtATime, setupSequenceAfter } from './structureStrategy'
 
 const candle = (index: number, open: number, high: number, low: number, close: number): Candle => ({
   time: 1_700_000_000 + index * 60,
@@ -423,6 +423,17 @@ describe('market structure strategy', () => {
     ] as never)
 
     expect(selected.map((item) => item.choch.time)).toEqual([10, 21])
+  })
+
+  it('treats a persisted resolution as an exclusive setup boundary', () => {
+    const setups = [
+      { detectedTime: 10, exitTime: 12 },
+      { detectedTime: 12, exitTime: 13 },
+      { detectedTime: 13, exitTime: 15 },
+      { detectedTime: 16, exitTime: 18 },
+    ] as never
+
+    expect(setupSequenceAfter(setups, 12).map((setup) => setup.detectedTime)).toEqual([13, 16])
   })
 
   it('retains the 01:27-centered bearish wick gap under the refined structure rules', () => {

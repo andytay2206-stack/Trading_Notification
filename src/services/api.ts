@@ -80,6 +80,15 @@ export interface StrategyNotification {
   decided_at: string | null
 }
 
+export interface AutomaticStrategyPerformance {
+  strategyVersion: string
+  wins: number
+  losses: number
+  winRate: number
+  netR: number
+  pnlUsd: number
+}
+
 export async function scanStrategy() {
   return jsonRequest<{ scanned: number; bias: string; startedAt: string }>('/api/strategy/scan', { method: 'POST' })
 }
@@ -89,7 +98,10 @@ export async function getStrategyState() {
 }
 
 export async function getStrategyNotifications() {
-  return jsonRequest<{ notifications: StrategyNotification[] }>('/api/strategy/notifications')
+  return jsonRequest<{
+    notifications: StrategyNotification[]
+    automaticPerformance?: AutomaticStrategyPerformance
+  }>('/api/strategy/notifications')
 }
 
 export async function decideStrategyNotification(id: string, decision: 'accepted' | 'dismissed') {
