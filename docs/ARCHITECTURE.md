@@ -65,6 +65,8 @@ The structure engine retains internal trend lines for BOS, CHoCH, and setup deci
 
 The market page owns one persistent Lightweight Charts instance. Changing the interval replaces that candlestick series' data and resets its interval identity; it does not mount a separate chart. The selected interval supplies the primary trend lines and markers. Fifteen-minute context is additionally overlaid only on the one-minute view, preventing duplicate or mislabeled one-minute lines on the 15-minute chart.
 
+The requested interval and loaded-data interval are tracked separately during a feed transition. The previous series can remain visible while the new REST page loads, but its timeframe identity cannot change early. Only after the complete replacement page arrives are its candles, strategy analysis, overlay labels, and series interval switched together. This prevents a shared 15-minute/1-minute timestamp from being mistaken for an incremental update and leaving mixed-spacing data in the chart.
+
 Pending signals carry a strategy version and setup type. `structure-v8` adds BOS continuation, confirmed structural trend lines, and live-wick lifecycle evaluation. Older records remain available; unresolved version-7 trades are reconciled by both their legacy event timestamp and current detection timestamp and keep the single slot occupied before version-8 begins.
 
 The chart, server scanner, notification outcomes, and backtester all consume the same strategy implementation.

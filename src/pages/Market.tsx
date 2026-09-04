@@ -33,6 +33,7 @@ const mergeCandles = (current: Candle[], incoming: Candle[]) => {
 
 export function Market() {
   const [interval, setInterval] = useState<CandleInterval>(initialInterval)
+  const [loadedInterval, setLoadedInterval] = useState<CandleInterval>(initialInterval)
   const [candles, setCandles] = useState<Candle[]>([])
   const [status, setStatus] = useState<ConnectionStatus>('connecting')
   const [error, setError] = useState<string | null>(null)
@@ -53,7 +54,10 @@ export function Market() {
       .then((incoming) => {
         if (!active) return
         setCandles((current) => initial ? incoming : mergeCandles(current, incoming))
-        if (initial) initialLoaded = true
+        if (initial) {
+          initialLoaded = true
+          setLoadedInterval(interval)
+        }
         setError(null)
         setLastUpdated(new Date())
         setStatus((current) => current === 'live' ? 'live' : 'polling')
@@ -116,18 +120,18 @@ export function Market() {
   const analysis = useMemo(() => analyzeStructure(candles), [candles])
   const fifteenMinuteAnalysis = useMemo(() => analyzeStructure(fifteenMinuteCandles), [fifteenMinuteCandles])
   const alignedSetups = useMemo(
-    () => interval === '1' && strategyStartedAt !== null
+    () => loadedInterval === '1' && strategyStartedAt !== null
       ? oneSetupAtATime(alignedOneMinuteSetups(analysis, fifteenMinuteAnalysis)
         .filter((setup) => setup.detectedTime >= strategyStartedAt))
       : [],
-    [analysis, fifteenMinuteAnalysis, interval, strategyStartedAt],
+    [analysis, fifteenMinuteAnalysis, loadedInterval, strategyStartedAt],
   )
   const selectedSetups = useMemo(
-    () => interval === '1' && strategyStartedAt !== null
+    () => loadedInterval === '1' && strategyStartedAt !== null
       ? oneSetupAtATime(analysis.fairValueGaps
         .filter((setup) => setup.detectedTime >= strategyStartedAt))
       : [],
-    [analysis, interval, strategyStartedAt],
+    [analysis, loadedInterval, strategyStartedAt],
   )
   const chartSetups = useMemo(
     () => selectedSetups.filter((setup) => setup.status === 'open' || setup.status === 'filled'),
@@ -190,7 +194,7 @@ export function Market() {
             ? <div className="chart-error"><b>Market data unavailable</b><span>{error}. Check the connection and retry.</span><button type="button" className="secondary-button" onClick={() => setReloadKey((key) => key + 1)}>Retry feed</button></div>
             : candles.length ? (
               <ChartErrorBoundary key={reloadKey} onReset={() => setReloadKey((key) => key + 1)}>
-                <CandleChart candles={candles} analysis={analysis} higherTimeframeAnalysis={fifteenMinuteAnalysis} interval={interval} tradeSetups={chartSetups} alignedSetupIds={alignedSetupIds} />
+                <CandleChart candles={candles} analysis={analysis} higherTimeframeAnalysis={fifteenMinuteAnalysis} interval={loadedInterval} tradeSetups={chartSetups} alignedSetupIds={alignedSetupIds} />
               </ChartErrorBoundary>
             ) : <div className="chart-loading"><i /><span>Loading Bybit candles…</span></div>}
         </div>
@@ -203,7 +207,7 @@ export function Market() {
             <p>Tracking BOS trend bounces and CHoCH reversals into fair value gap pullbacks. The 15-minute structure is context; the 1-minute structure creates the setup.</p>
             <div className="strategy-direction"><span>15m direction</span><b className={fifteenMinuteAnalysis.bias === 'long' ? 'positive' : fifteenMinuteAnalysis.bias === 'short' ? 'negative' : ''}>{fifteenMinuteAnalysis.bias}</b></div>
             <div className="strategy-direction"><span>Selected 1m setup</span><b className={chartSetupIsAligned ? 'positive' : chartSetups.length ? 'warning' : ''}>{chartSetups.length ? (chartSetupIsAligned ? 'Aligned' : 'Possible') : 'None'}</b></div>
-            <div className="strategy-direction"><span>15m-aligned setups</span><b>{interval === '1' ? alignedSetups.length : 'Select 1m'}</b></div>
+            <div className="strategy-direction"><span>15m-aligned setups</span><b>{loadedInterval === '1' ? alignedSetups.length : 'Select 1m'}</b></div>
           </article>
 
           <article className="panel market-details">
